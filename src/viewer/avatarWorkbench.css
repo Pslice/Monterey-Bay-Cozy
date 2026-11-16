@@ -85,3 +85,15 @@ body[data-avatar-view] .asset-tabs{background:#244f48f2;border-color:#86ab943d}b
 
 /* Suit shares the existing touch controls; no extra overlay over the world. */
 .gym-layout.is-flying-suit #gym-dive{display:block}.gym-layout.is-flying-suit #gym-suit-return{display:block}.gym-layout.is-flying-suit #gym-emote-toggle{display:none}
+/* 2 Player Arcade: doorway fade between the street and the Suite A screen, and the cabinet game overlay. */
+.gym-transition{position:absolute;inset:0;z-index:8;display:grid;place-items:center;background:#0e1518e6;color:#f2efe2;font:600 18px/1.4 system-ui,sans-serif;letter-spacing:-.01em}
+.gym-transition[hidden],.gym-arcade-game[hidden]{display:none}
+.gym-arcade-game{position:absolute;inset:14px;z-index:9;display:flex;flex-direction:column;border-radius:18px;overflow:hidden;background:#0a1f33;box-shadow:0 12px 40px #0008}
+.gym-arcade-game-bar{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#102c45;color:#eef6fb;font:14px/1.3 system-ui,sans-serif}
+.gym-arcade-game-bar strong{flex:1;font-size:15px}
+.gym-arcade-game-bar a{color:#9fd8ff}
+.gym-arcade-game-bar button{border:0;border-radius:9px;padding:8px 12px;background:#eef6fb;color:#102c45;font:600 13px system-ui,sans-serif;cursor:pointer}
+.gym-arcade-game-bar kbd{font:11px ui-monospace,monospace;opacity:.7;margin-left:4px}
+.gym-arcade-game iframe{flex:1;width:100%;border:0;background:#0a1f33}
+.gym-arcade-game-note{margin:0;padding:6px 14px 9px;background:#102c45;color:#a9c3d6;font:12px/1.4 system-ui,sans-serif}
+@media(max-width:620px){.gym-arcade-game{inset:6px;border-radius:12px}.gym-arcade-game-bar{flex-wrap:wrap}}

@@ -21,6 +21,7 @@ With the shared development preview running at `http://127.0.0.1:5191/` and Chro
 | --- | --- |
 | Gym loading / performance panel | `frame-metrics.test.ts`; `gym-diagnostics-browser.mjs` (delayed imports, first frame, both backends, keyboard/touch, tab switching and failed loading) |
 | Catalog coverage and furniture | `asset-inventory.test.ts`, `asset-contract.test.ts`, `lod.test.ts`; `asset-inventory-browser.mjs` checks categorized selection, all six additions/LODs and Gym café on both backends |
+| 2 Player Arcade (398 Foam St) | `two-player-arcade.test.ts` (OSM placement, rotation, budgets per level, cutaway, door route and collisions, disposal); `two-player-arcade-browser.mjs` (destination link; street, rear and interior captures; keyboard walk in to the separate interior screen and back out; game overlay open/close; Near/Mid/Far; both backends) |
 | Caledonia district | `caledonia.test.ts`, `caledonia-meals.test.ts`, `caledonia-playgrounds.test.ts`; `caledonia-browser.mjs` (whole-park gates, ground seams, photo-informed building/playgrounds, destination/deep link/reset, both backends and touch) |
 | Creature geometry, state, scale or disposal | `asset-contract`, `collection`, `lifecycle`, `attachments`, species `*.test.ts`; matching species browser suite, `browser-qa.mjs` |
 | Gray whale and Demo exclusion | `gray-whale`, `species-sizes`, `tank-demo`; `gray-whale-browser.mjs` (both backends, LODs, caught state and phone framing) |

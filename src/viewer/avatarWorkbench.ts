@@ -2,6 +2,7 @@ import {createGymSurrey} from './testingGym/surrey';
 import {createWaterEffectsPanel} from './waterEffectsPanel';
 import type {createEnhancedWater} from './enhancedWater';
 import type { createGymDeer } from './testingGym/deer';
+import type { ArcadeRoomScreen } from './testingGym/arcadeRoom';
 import { createGymDiagnostics } from './gymDiagnostics';
 import { setGymLoading, paintLoadingStage } from './gymLoading';
 import type { createCaledoniaLabels } from './mapStudy/caledoniaLabels';
@@ -30,8 +31,8 @@ import type { createGymBayExtension } from './testingGym/bayExtension';
 import type { createGymBayLabels } from './testingGym/bayLabels';
 
 type ActiveView = 'avatars' | 'gym' | null;
-type GymDestination = 'lovers-point' | 'caledonia-park' | 'museum';
-const DESTINATION_NAMES:Record<GymDestination,string>={'lovers-point':'Lovers Point','caledonia-park':'Caledonia Park',museum:'Natural History Museum'};
+type GymDestination = 'lovers-point' | 'caledonia-park' | 'museum' | 'arcade';
+const DESTINATION_NAMES:Record<GymDestination,string>={'lovers-point':'Lovers Point','caledonia-park':'Caledonia Park',museum:'Natural History Museum',arcade:'2 Player Arcade'};
 type Emote = 'none' | 'wave' | 'cheer' | 'sit' | 'cast';
 const PALETTES = {
   skinTone: [['Porcelain','#f5d5b7'],['Peach','#e8b58a'],['Golden','#dba477'],['Honey','#c78c59'],['Warm brown','#a96d47'],['Chestnut','#855134'],['Deep brown','#603a2c'],['Umber','#432a24']],
@@ -65,7 +66,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
   studioHost.innerHTML=`<div class="av-studio"><div class="av-preview"><div class="av-intro"><span class="av-eyebrow">Make yourself at home</span><h1>Your coastal character</h1><p>A little personality for a big bay.</p></div><div id="avatar-viewport" class="av-viewport"></div><div class="av-preview-bottom"><div class="av-preview-label">Drag to turn · scroll to zoom<br><span id="avatar-height">Original design · metre scale</span></div><div class="av-animation"><select id="avatar-pose" aria-label="Preview animation"><option value="idle">Idle</option><option value="walk">Walk</option><option value="run">Run</option><option value="swim">Swim</option><option value="tread">Tread water</option></select><button data-emote="wave">Wave</button><button data-emote="cheer">Cheer</button></div></div></div><div class="av-controls"><div class="av-controls-header"><label for="avatar-name">Character name</label><input id="avatar-name" maxlength="32" autocomplete="off" spellcheck="false"></div><div class="av-category-tabs" role="tablist" aria-label="Character options">${[['you','You'],['hair','Hair'],['face','Face'],['outfit','Outfit']].map(([id,name],i)=>`<button id="av-category-${id}" role="tab" data-category="${id}" aria-controls="av-options-${id}" aria-selected="${i===0}" tabindex="${i===0?'0':'-1'}">${name}</button>`).join('')}</div><div class="av-customize"><section id="av-options-you" role="tabpanel" aria-labelledby="av-category-you">${sizeControls()}${swatches('skinTone','Skin tone')}<p class="av-hint">Every hairstyle, face, and outfit is yours to mix. Outfits can change whenever you like.</p><button id="avatar-shuffle" class="secondary">Try a new combination</button></section><section id="av-options-hair" role="tabpanel" aria-labelledby="av-category-hair" hidden>${options('hairStyle','Hairstyle')}${swatches('hairColor','Hair color')}</section><section id="av-options-face" role="tabpanel" aria-labelledby="av-category-face" hidden>${options('eyeStyle','Eyes')}${swatches('eyeColor','Eye color')}${options('mouthStyle','Expression')}${options('faceLines','Face lines')}</section><section id="av-options-outfit" role="tabpanel" aria-labelledby="av-category-outfit" hidden>${options('topStyle','Top')}${swatches('topColor','Top color')}${options('bottomStyle','Bottoms')}${swatches('bottomColor','Bottom color')}${swatches('shoeColor','Shoes')}</section></div><div class="av-save-area"><div class="av-save-actions"><button id="avatar-save" class="primary">Save character</button><button id="avatar-to-gym" class="secondary">Try in Testing Gym →</button></div><output id="avatar-message" class="av-message" aria-live="polite">Saved characters stay in this browser. Download a copy to keep.</output><details class="av-library"><summary>Saved characters &amp; files <span id="avatar-save-count">· 0</span></summary><div class="av-library-row"><select id="avatar-saved" aria-label="Saved characters"></select><button id="avatar-load">Load</button></div><div class="av-download-row"><button id="avatar-save-copy">Save as new</button><button id="avatar-export">Download JSON</button><button id="avatar-import-button">Import JSON</button><input id="avatar-import" type="file" accept=".json,application/json" hidden></div></details><details class="av-performance"><summary id="avatar-budget-summary">Rendering budget</summary><label>Detail <select id="avatar-lod">${lodOptions()}</select></label><table><thead><tr><th>Detail</th><th>Triangles</th><th>Draws</th></tr></thead><tbody id="avatar-lod-rows"></tbody></table><p id="avatar-budget"></p></details></div></div></div>`;
   // Play HUD: the world stays visible. Contextual prompts appear only when useful; tools live
   // in one menu; touch controls appear only for touch input. No per-player state is global UI.
-  gymHost.innerHTML=`<div class="gym-layout"><div id="gym-viewport" class="av-viewport"></div><div class="gym-toolbar"><div class="gym-place"><span class="av-eyebrow">Testing Gym</span><h1>Lovers Point</h1></div><div class="gym-toolbar-controls"><button id="gym-back">← Edit character</button><details id="gym-menu" class="gym-menu"><summary aria-label="Gym menu">Menu</summary><div class="gym-menu-panel"><label class="gym-menu-character">Character <select id="gym-avatar" aria-label="Gym character"></select></label><label class="gym-menu-character">Destination <select id="gym-destination" aria-label="Gym destination"><option value="lovers-point">Lovers Point</option><option value="caledonia-park">Caledonia Park</option><option value="museum">Natural History Museum</option></select></label><div class="gym-menu-actions"><button id="gym-reset">Back to start</button><button id="gym-swim-start">Try swimming</button><button id="gym-caledonia-visit">Visit Caledonia Park</button><button id="gym-caledonia-top">Caledonia · top view</button><button id="gym-meals-visit">Meals on Wheels center</button><button id="gym-pool-visit">Pool &amp; volleyball court</button><button id="gym-surrey-visit">Ride a surrey</button><button id="gym-suit-station">Otter Man station</button><button id="gym-museum-visit">Visit Natural History Museum</button><button id="gym-museum-upper">Visit museum mezzanine</button><button id="gym-museum-overview">Museum exterior study</button><button id="gym-waterfront-view">Waterfront overview</button><button id="gym-squirrels-visit">Rockside squirrels</button><button id="gym-coastal-view">Coastal wildlife</button><button id="gym-whale-view">Whale lookout</button><label class="gym-menu-character">Deer <select id="gym-deer-place" aria-label="Find deer"><option value="">Choose a place</option></select></label><button id="gym-bay-overview" aria-pressed="false">Monterey Bay overview</button><label class="gym-menu-character">Bay place <select id="gym-bay-place" aria-label="Focus a Monterey Bay place"><option value="">Whole bay</option></select></label><button id="gym-overview" aria-pressed="false">Park overview</button></div><dl class="gym-help" aria-label="Controls"><dt>WASD / arrows</dt><dd>Move</dd><dt>Space</dt><dd>Jump · swim up · suit lift</dd><dt>C</dt><dd>Dive · descend in suit</dd><dt>Shift</dt><dd>Run · row faster · flight boost</dd><dt>E</dt><dd>Interact</dd><dt>Q</dt><dd>Emote wheel · 1–3 quick emotes</dd><dt>Drag · scroll</dt><dd>Look · zoom</dd></dl><dl class="gym-help" aria-label="Controller"><dt>Left stick</dt><dd>Move</dd><dt>Right stick</dt><dd>Look</dd><dt>A</dt><dd>Jump · swim up · suit lift</dd><dt>B</dt><dd>Run · dive · boat faster</dd><dt>X</dt><dd>Interact</dd><dt>Y</dt><dd>Emote wheel · second choice on the dive boat</dd><dt>D-pad</dt><dd>Quick emotes</dd><dt>Menu</dt><dd>This menu</dd></dl><details class="gym-performance"><summary>World &amp; rendering notes</summary><p>Coast, paths, beaches, pool and court follow map data. Terrain follows USGS elevation data. Structures, planting and play stations remain approximations.</p><label>Detail <select id="gym-lod">${lodOptions()}</select></label><p id="gym-budget"></p><table aria-label="Park detail levels"><thead><tr><th>Detail</th><th>Triangles</th><th>Draws</th></tr></thead><tbody id="gym-lod-rows"></tbody></table><p id="gym-storage"></p></details></div></details></div></div><p id="gym-hint" class="gym-hint"><span class="for-keys"><kbd>WASD</kbd> move <kbd>Space</kbd> jump <kbd>Shift</kbd> run <kbd>E</kbd> interact <kbd>Q</kbd> emotes</span><span class="for-pad"><kbd>L</kbd> move <kbd>A</kbd> jump <kbd>B</kbd> run <kbd>X</kbd> interact <kbd>Y</kbd> emotes</span></p><div id="gym-breath" class="gym-breath" hidden><svg viewBox="0 0 44 44" aria-hidden="true"><circle class="gym-breath-track" cx="22" cy="22" r="18"/><circle id="gym-breath-ring" class="gym-breath-fill" cx="22" cy="22" r="18" pathLength="100"/></svg><span id="gym-breath-time" class="gym-breath-time" aria-hidden="true"></span><progress id="gym-breath-meter" class="gym-sr-only" max="${AVATAR_SWIMMING.breathSeconds}" value="${AVATAR_SWIMMING.breathSeconds}" aria-label="Breath remaining"></progress><p id="gym-breath-hint" class="gym-sr-only">Return to shore before it runs out.</p></div><div class="gym-prompt-area"><p id="gym-message" role="status"></p><div class="gym-prompt-row"><button id="gym-interact" class="gym-prompt" hidden disabled><kbd aria-hidden="true"><span class="for-keys">E</span><span class="for-pad">X</span></kbd><span id="gym-interact-label"></span></button><button id="gym-interact-alt" class="gym-prompt gym-prompt-alt" hidden><kbd aria-hidden="true"><span class="for-keys">R</span><span class="for-pad">Y</span></kbd><span id="gym-interact-alt-label"></span></button></div></div><div id="gym-emote-menu" class="gym-emote-wheel" role="menu" aria-label="Emotes" hidden>${GYM_EMOTES.map(([value,name,key],i)=>`<button role="menuitem" data-emote="${value}" aria-pressed="false" style="--angle:${-90+i*360/GYM_EMOTES.length}deg">${name}<small aria-hidden="true">${key}</small></button>`).join('')}<span class="gym-emote-hub" aria-hidden="true"><span class="for-keys">Q</span><span class="for-pad">Y</span> close</span></div><div class="gym-controls"><div class="gym-movement"><div class="gym-dpad" role="group" aria-label="Movement"><button data-move="forward" aria-label="Walk forward" aria-pressed="false">↑</button><button data-move="left" aria-label="Walk left" aria-pressed="false">←</button><button data-move="back" aria-label="Walk backward" aria-pressed="false">↓</button><button data-move="right" aria-label="Walk right" aria-pressed="false">→</button></div><button id="gym-run" aria-pressed="false">Run</button></div><div class="gym-actions"><div class="gym-emotes"><button id="gym-suit-return" hidden>Return suit to station</button><button id="gym-return-rod" hidden>Return rod</button><button id="gym-emote-toggle" aria-haspopup="menu" aria-expanded="false" aria-controls="gym-emote-menu">Emotes <kbd class="for-keys" aria-hidden="true">Q</kbd><kbd class="for-pad" aria-hidden="true">Y</kbd></button></div><div class="gym-jump-pair"><button id="gym-dive" class="gym-dive" aria-label="Dive">Dive</button><button id="gym-jump" class="gym-jump" aria-label="Jump">Jump</button></div></div></div><div class="gym-credit">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · USGS terrain · Local prototype</div></div>`;
+  gymHost.innerHTML=`<div class="gym-layout"><div id="gym-viewport" class="av-viewport"></div><div class="gym-toolbar"><div class="gym-place"><span class="av-eyebrow">Testing Gym</span><h1>Lovers Point</h1></div><div class="gym-toolbar-controls"><button id="gym-back">← Edit character</button><details id="gym-menu" class="gym-menu"><summary aria-label="Gym menu">Menu</summary><div class="gym-menu-panel"><label class="gym-menu-character">Character <select id="gym-avatar" aria-label="Gym character"></select></label><label class="gym-menu-character">Destination <select id="gym-destination" aria-label="Gym destination"><option value="lovers-point">Lovers Point</option><option value="caledonia-park">Caledonia Park</option><option value="museum">Natural History Museum</option><option value="arcade">2 Player Arcade</option></select></label><div class="gym-menu-actions"><button id="gym-reset">Back to start</button><button id="gym-swim-start">Try swimming</button><button id="gym-caledonia-visit">Visit Caledonia Park</button><button id="gym-caledonia-top">Caledonia · top view</button><button id="gym-meals-visit">Meals on Wheels center</button><button id="gym-pool-visit">Pool &amp; volleyball court</button><button id="gym-surrey-visit">Ride a surrey</button><button id="gym-suit-station">Otter Man station</button><button id="gym-museum-visit">Visit Natural History Museum</button><button id="gym-museum-upper">Visit museum mezzanine</button><button id="gym-museum-overview">Museum exterior study</button><button id="gym-arcade-visit">Visit 2 Player Arcade</button><button id="gym-arcade-street">2 Player Arcade · Foam St</button><button id="gym-waterfront-view">Waterfront overview</button><button id="gym-squirrels-visit">Rockside squirrels</button><button id="gym-coastal-view">Coastal wildlife</button><button id="gym-whale-view">Whale lookout</button><label class="gym-menu-character">Deer <select id="gym-deer-place" aria-label="Find deer"><option value="">Choose a place</option></select></label><button id="gym-bay-overview" aria-pressed="false">Monterey Bay overview</button><label class="gym-menu-character">Bay place <select id="gym-bay-place" aria-label="Focus a Monterey Bay place"><option value="">Whole bay</option></select></label><button id="gym-overview" aria-pressed="false">Park overview</button></div><dl class="gym-help" aria-label="Controls"><dt>WASD / arrows</dt><dd>Move</dd><dt>Space</dt><dd>Jump · swim up · suit lift</dd><dt>C</dt><dd>Dive · descend in suit</dd><dt>Shift</dt><dd>Run · row faster · flight boost</dd><dt>E</dt><dd>Interact</dd><dt>Q</dt><dd>Emote wheel · 1–3 quick emotes</dd><dt>Drag · scroll</dt><dd>Look · zoom</dd></dl><dl class="gym-help" aria-label="Controller"><dt>Left stick</dt><dd>Move</dd><dt>Right stick</dt><dd>Look</dd><dt>A</dt><dd>Jump · swim up · suit lift</dd><dt>B</dt><dd>Run · dive · boat faster</dd><dt>X</dt><dd>Interact</dd><dt>Y</dt><dd>Emote wheel · second choice on the dive boat</dd><dt>D-pad</dt><dd>Quick emotes</dd><dt>Menu</dt><dd>This menu</dd></dl><details class="gym-performance"><summary>World &amp; rendering notes</summary><p>Coast, paths, beaches, pool and court follow map data. Terrain follows USGS elevation data. Structures, planting and play stations remain approximations.</p><label>Detail <select id="gym-lod">${lodOptions()}</select></label><p id="gym-budget"></p><table aria-label="Park detail levels"><thead><tr><th>Detail</th><th>Triangles</th><th>Draws</th></tr></thead><tbody id="gym-lod-rows"></tbody></table><p id="gym-storage"></p></details></div></details></div></div><p id="gym-hint" class="gym-hint"><span class="for-keys"><kbd>WASD</kbd> move <kbd>Space</kbd> jump <kbd>Shift</kbd> run <kbd>E</kbd> interact <kbd>Q</kbd> emotes</span><span class="for-pad"><kbd>L</kbd> move <kbd>A</kbd> jump <kbd>B</kbd> run <kbd>X</kbd> interact <kbd>Y</kbd> emotes</span></p><div id="gym-breath" class="gym-breath" hidden><svg viewBox="0 0 44 44" aria-hidden="true"><circle class="gym-breath-track" cx="22" cy="22" r="18"/><circle id="gym-breath-ring" class="gym-breath-fill" cx="22" cy="22" r="18" pathLength="100"/></svg><span id="gym-breath-time" class="gym-breath-time" aria-hidden="true"></span><progress id="gym-breath-meter" class="gym-sr-only" max="${AVATAR_SWIMMING.breathSeconds}" value="${AVATAR_SWIMMING.breathSeconds}" aria-label="Breath remaining"></progress><p id="gym-breath-hint" class="gym-sr-only">Return to shore before it runs out.</p></div><div class="gym-prompt-area"><p id="gym-message" role="status"></p><div class="gym-prompt-row"><button id="gym-interact" class="gym-prompt" hidden disabled><kbd aria-hidden="true"><span class="for-keys">E</span><span class="for-pad">X</span></kbd><span id="gym-interact-label"></span></button><button id="gym-interact-alt" class="gym-prompt gym-prompt-alt" hidden><kbd aria-hidden="true"><span class="for-keys">R</span><span class="for-pad">Y</span></kbd><span id="gym-interact-alt-label"></span></button></div></div><div id="gym-emote-menu" class="gym-emote-wheel" role="menu" aria-label="Emotes" hidden>${GYM_EMOTES.map(([value,name,key],i)=>`<button role="menuitem" data-emote="${value}" aria-pressed="false" style="--angle:${-90+i*360/GYM_EMOTES.length}deg">${name}<small aria-hidden="true">${key}</small></button>`).join('')}<span class="gym-emote-hub" aria-hidden="true"><span class="for-keys">Q</span><span class="for-pad">Y</span> close</span></div><div class="gym-controls"><div class="gym-movement"><div class="gym-dpad" role="group" aria-label="Movement"><button data-move="forward" aria-label="Walk forward" aria-pressed="false">↑</button><button data-move="left" aria-label="Walk left" aria-pressed="false">←</button><button data-move="back" aria-label="Walk backward" aria-pressed="false">↓</button><button data-move="right" aria-label="Walk right" aria-pressed="false">→</button></div><button id="gym-run" aria-pressed="false">Run</button></div><div class="gym-actions"><div class="gym-emotes"><button id="gym-suit-return" hidden>Return suit to station</button><button id="gym-return-rod" hidden>Return rod</button><button id="gym-emote-toggle" aria-haspopup="menu" aria-expanded="false" aria-controls="gym-emote-menu">Emotes <kbd class="for-keys" aria-hidden="true">Q</kbd><kbd class="for-pad" aria-hidden="true">Y</kbd></button></div><div class="gym-jump-pair"><button id="gym-dive" class="gym-dive" aria-label="Dive">Dive</button><button id="gym-jump" class="gym-jump" aria-label="Jump">Jump</button></div></div></div><div class="gym-credit">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · USGS terrain · Local prototype</div></div>`;
   const $=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
   const on=(id:string,type:string,listener:EventListener)=>$(id).addEventListener(type,listener,{signal});
   const params=new URLSearchParams(location.search),reduced=matchMedia('(prefers-reduced-motion: reduce)');
@@ -112,7 +113,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
   let seatReturn:Vector3|undefined;
   let caledoniaOverview=false,caledoniaLabels:ReturnType<typeof createCaledoniaLabels>|undefined;
   const requestedDestination=params.get('destination');
-  const initialDestination:GymDestination=requestedDestination==='caledonia-park'||requestedDestination==='museum'?requestedDestination:'lovers-point';
+  const initialDestination:GymDestination=requestedDestination==='caledonia-park'||requestedDestination==='museum'||requestedDestination==='arcade'?requestedDestination:'lovers-point';
   let destination:GymDestination='lovers-point';
   let overview=false,bayOverview=false,bayFocusId='',sizeTimer=0;
   const motion={pedalPhase:undefined as number|undefined,speed:0,emote:'none' as Emote,reducedMotion:reduced.matches,carrying:false,swimming:false,airborne:false,verticalVelocity:0,landing:0,flying:false,boosting:false,submerged:false};
@@ -179,7 +180,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
     const generation=++revision,old=avatar;editIntent++;design=normalizeAvatarDesign(next);
     const position=old.root.position.clone(),rotation=old.root.rotation.clone();
     avatar=createAvatarModel(design,{gear:scuba?'scuba':otterSuit?'otter-man':'none'});avatar.root.position.copy(position);avatar.root.rotation.copy(rotation);applyNodeStyle(avatar.root,tier==='standard',weather.environment);
-    if(heldRod)attachRod();old.root.removeFromParent();old.dispose();(active==='gym'?gymScene:studio).add(avatar.root);
+    if(heldRod)attachRod();old.root.removeFromParent();old.dispose();(active==='gym'?gymStage():studio).add(avatar.root);
     if(gym&&active==='gym'){makeController(position);avatar.root.rotation.copy(rotation);}
     updateSizePresentation();updateSelections();updateLibrary();dirty=true;message('Unsaved changes · save when you’re ready.');
     await lod.register(avatar.root);if(disposed||generation!==revision)return;budget();
@@ -199,19 +200,24 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
     $('gym-jump').setAttribute('aria-label',otter?'Lift off or ascend':'Jump');$('gym-dive').setAttribute('aria-label',otter?'Descend and land':'Dive');
     const generation=++revision,old=avatar,position=old.root.position.clone(),rotation=old.root.rotation.clone();
     avatar=createAvatarModel(design,{gear:on?'scuba':otter?'otter-man':'none'});avatar.root.position.copy(position);avatar.root.rotation.copy(rotation);applyNodeStyle(avatar.root,tier==='standard',weather.environment);
-    if(heldRod)attachRod();old.root.removeFromParent();old.dispose();(active==='gym'?gymScene:studio).add(avatar.root);
+    if(heldRod)attachRod();old.root.removeFromParent();old.dispose();(active==='gym'?gymStage():studio).add(avatar.root);
     if(gym&&active==='gym'&&!aboard){makeController(position);avatar.root.rotation.copy(rotation);}
     if(otter&&gym)flight=createFlightController(avatar.root,bayExtension?.flightBounds??gym.flightBounds,bayExtension?.floorAt??gym.flightFloor,gym.flightObstacles,bayExtension?.waterAt??gym.flightWater,bayExtension?.canLandAt);else flight=undefined;
     updateSizePresentation();breathDisplay=-1;
     void lod.register(avatar.root).then(()=>{if(!disposed&&generation===revision)budget();});
   }
   let museumFloor:'ground'|'upper'|null=null;
+  /** 398 Foam Street owns a separate walking region (flat level pad, own colliders). */
+  let arcadeMode=false;
+  /** Suite A is a separate interior screen (its own Scene); `arcadeTransition` locks input during the fade. */
+  let arcadeInside=false,arcadeTransition=false,arcadeRoom:ArcadeRoomScreen|undefined,gameOpen=false;
+  const gymStage=()=>arcadeInside&&arcadeRoom?arcadeRoom.scene:gymScene;
   function makeController(position?:Vector3,fresh=false,resumeState?:AvatarControllerState){
     if(!gym)return;
     let state=fresh?undefined:resumeState??controller?.getState()??gymControllerState;
     if(state&&position)state={...state,position:position.toArray(),heading:avatar.root.rotation.y,velocity:[0,0]};
-    controller=createAvatarController({root:avatar.root,spawn:gym.spawn,bounds:museumFloor==='upper'?gym.museum.upperBounds:gym.bounds,colliders:museumFloor==='upper'?gym.museum.upperColliders:gym.colliders,
-      groundHeight:seatReturn?undefined:(x,z)=>museumFloor==='upper'?MUSEUM_SITE.floor+MUSEUM_SITE.upper+.045:gym!.swimGroundHeight(x,z)+.045,water:seatReturn||museumFloor==='upper'?undefined:gym.swimming,state,
+    controller=createAvatarController({root:avatar.root,spawn:arcadeMode?gym.arcade.entrance:gym.spawn,bounds:arcadeMode?gym.arcade.bounds:museumFloor==='upper'?gym.museum.upperBounds:gym.bounds,colliders:arcadeMode?gym.arcade.colliders:museumFloor==='upper'?gym.museum.upperColliders:gym.colliders,
+      groundHeight:seatReturn?undefined:(x,z)=>arcadeMode?gym!.arcade.floorY+.045:museumFloor==='upper'?MUSEUM_SITE.floor+MUSEUM_SITE.upper+.045:gym!.swimGroundHeight(x,z)+.045,water:seatReturn||museumFloor==='upper'||arcadeMode?undefined:gym.swimming,state,
       body:{radius:avatar.dimensions.controllerRadius,swimDepth:avatar.dimensions.swimDepth,swimImmersion:avatar.dimensions.swimImmersion},air:scuba?SCUBA_AIR:undefined});
     if(!state&&position)controller.restoreState({...controller.getState(),position:position.toArray(),velocity:[0,0]});
     // A seat is a visual placement above the ground; the controller must not snap it down.
@@ -383,6 +389,11 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
   document.addEventListener('pointerdown',e=>{const target=e.target as Node;if(!emoteMenu.hidden&&!emoteMenu.contains(target)&&!$('gym-emote-toggle').contains(target))closeEmotes();},{signal});
   // Touch controls follow the input actually in use, so desktop players never see a d-pad.
   const layout=gymHost.querySelector<HTMLElement>('.gym-layout')!;
+  const arcadeFade=document.createElement('div');arcadeFade.className='gym-transition';arcadeFade.hidden=true;arcadeFade.setAttribute('role','status');arcadeFade.innerHTML='<p></p>';layout.append(arcadeFade);
+  const gameOverlay=document.createElement('div');gameOverlay.className='gym-arcade-game';gameOverlay.hidden=true;gameOverlay.setAttribute('role','dialog');gameOverlay.setAttribute('aria-modal','true');
+  gameOverlay.innerHTML='<div class="gym-arcade-game-bar"><strong></strong><a target="_blank" rel="noopener noreferrer">Open in a new tab ↗</a><button type="button">Close <kbd>Esc</kbd></button></div><iframe allow="fullscreen; gamepad; autoplay" allowfullscreen></iframe><p class="gym-arcade-game-note">Blank screen? The game’s site may not allow embedding. Use “Open in a new tab”.</p>';
+  layout.append(gameOverlay);gameOverlay.querySelector('button')!.addEventListener('click',()=>closeGame(),{signal});
+  const gameFrame=gameOverlay.querySelector('iframe')!;
   layout.classList.toggle('uses-touch',matchMedia('(pointer: coarse)').matches);
   gymHost.addEventListener('pointerdown',e=>{layout.classList.remove('uses-gamepad');if(e.pointerType==='touch')layout.classList.add('uses-touch');else if(e.pointerType==='mouse')layout.classList.remove('uses-touch');},{signal,capture:true});
   // A pointer click on a HUD button hands focus back to the world so Space/WASD keep playing.
@@ -414,7 +425,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
     if(!overview)$('gym-overview').textContent=next==='caledonia-park'?'Caledonia overview':'Park overview';
   }
   function frameGym(){if(!gym)return;deerViewId='';caledoniaOverview=false;setUnderwater(false);overview=false;bayOverview=false;gymHost.querySelector('.gym-layout')?.classList.remove('is-bay-overview');gymLocal.visible=true;if(bayExtension){gymRegional.visible=false;bayExtension.setDetailed(true);}gym.water.root.visible=true;$('gym-bay-overview').setAttribute('aria-pressed','false');camera.near=.25;camera.far=3500;(gymScene.fog as Fog).near=160;(gymScene.fog as Fog).far=480;$('gym-overview').setAttribute('aria-pressed','false');$('gym-overview').textContent=destination==='caledonia-park'?'Caledonia overview':'Park overview';orbit.minDistance=3.5;orbit.maxDistance=otterSuit?45:17;orbit.minPolarAngle=.35;orbit.maxPolarAngle=Math.PI*.46;orbit.target.copy(avatar.root.position).add(new Vector3(0,.9*avatar.dimensions.heightScale,0));camera.fov=49;camera.position.copy(orbit.target).add(new Vector3(-4.5,3.2,6));camera.updateProjectionMatrix();orbit.update();}
-  function resetGym(){if(!gym)return;ridingSurrey=false;surrey?.stop();boatControls(false);setDestination('lovers-point');museumFloor=null;gym.museum.setView('exterior');if(ridingSurrey)leaveSurrey(true);if(boating)leaveBoat(true);if(aboard)leaveDiveBoat('pier');gym.diveBoat.vessel.reset();swapGear(false);gym.vessel.reset();clearInput();chooseEmote('none');avatar.root.position.copy(gym.spawn);avatar.root.rotation.set(0,0,0);makeController(undefined,true);motion.swimming=false;airborne=false;swimControls(false);wasLowBreath=false;footShadow.visible=true;frameGym();notify('Back at the park entrance.',3);focusCanvas();}
+  function resetGym(){if(!gym)return;ridingSurrey=false;surrey?.stop();boatControls(false);setDestination('lovers-point');museumFloor=null;gym.museum.setView('exterior');closeGame();if(arcadeInside){arcadeInside=false;gymScene.add(avatar.root);}arcadeMode=false;gym.arcade.setView('exterior');if(ridingSurrey)leaveSurrey(true);if(boating)leaveBoat(true);if(aboard)leaveDiveBoat('pier');gym.diveBoat.vessel.reset();swapGear(false);gym.vessel.reset();clearInput();chooseEmote('none');avatar.root.position.copy(gym.spawn);avatar.root.rotation.set(0,0,0);makeController(undefined,true);motion.swimming=false;airborne=false;swimControls(false);wasLowBreath=false;footShadow.visible=true;frameGym();notify('Back at the park entrance.',3);focusCanvas();}
   function frameOverview(){
     if(!gym)return;deerViewId='';caledoniaOverview=false;
     setUnderwater(false);overview=true;bayOverview=false;gymHost.querySelector('.gym-layout')?.classList.remove('is-bay-overview');gymLocal.visible=true;if(bayExtension){gymRegional.visible=false;bayExtension.setDetailed(true);}gym.water.root.visible=true;$('gym-bay-overview').setAttribute('aria-pressed','false');orbit.maxDistance=2200;orbit.maxPolarAngle=Math.PI*.46;
@@ -457,6 +468,56 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
     const position=(upper?gym.museum.upstairs:gym.museum.entrance).clone();avatar.root.position.copy(position);avatar.root.rotation.y=Math.atan2(MUSEUM_SITE.back[0],MUSEUM_SITE.back[1]);makeController(position,true);setDestination('museum');frameGym();camera.position.copy(orbit.target).add(new Vector3(2.5,4.8,-6.7));orbit.update();$('gym-hint').classList.add('is-done');closeMenu();
     notify(upper?'Changes · museum mezzanine. Use the menu to return to the ground floor.':'Pacific Grove Museum of Natural History · ground floor study',5);focusCanvas();
   }
+  function visitArcade(inside=true){
+    if(!gym)return;returnRod();resetGym();arcadeMode=true;
+    const a=gym.arcade,position=a.street.clone();avatar.root.position.copy(position);avatar.root.rotation.y=a.yawInland;makeController(position,true);setDestination('arcade');frameGym();
+    camera.position.copy(orbit.target).add(new Vector3(Math.sin(a.yawInland),0,Math.cos(a.yawInland)).multiplyScalar(-9)).add(new Vector3(0,3.4,0));orbit.update();
+    $('gym-hint').classList.add('is-done');closeMenu();
+    if(inside)void enterArcade();
+    else{notify('398 Foam Street, New Monterey. Walk through the open porch door to go inside the 2 Player Arcade.',6);focusCanvas();}
+  }
+  const showFade=(text:string)=>{arcadeFade.querySelector('p')!.textContent=text;arcadeFade.hidden=false;};
+  /** Load the separate Suite A screen. The room is built once, on first entry, then reused. */
+  async function enterArcade(){
+    if(!gym||arcadeInside||arcadeTransition)return;
+    arcadeTransition=true;returnRod();clearInput();closeEmotes();chooseEmote('none');nearest=undefined;setPrompt();showFade('Entering 2 Player Arcade…');
+    try{
+      await paintLoadingStage();
+      if(!arcadeRoom){const module=await import('./testingGym/arcadeRoom');if(disposed||!gym)return;arcadeRoom=module.createArcadeRoomScreen(gym.arcade,tier==='standard');await lod.register(arcadeRoom.root);await renderer.compileAsync(arcadeRoom.scene,camera);if(disposed)return;}
+      const a=gym.arcade,position=a.doorInside.clone();
+      arcadeMode=true;arcadeInside=true;arcadeRoom.scene.add(avatar.root);avatar.root.position.copy(position);avatar.root.rotation.y=a.yawArrive;makeController(position,true);setDestination('arcade');
+      footShadow.visible=false;frameGym();orbit.minDistance=1.6;orbit.maxDistance=5;
+      // Start from the front-right of the room, like the interior photograph, looking toward the cabinets.
+      camera.position.copy(a.photoView.position);orbit.update();
+      notify('Inside the 2 Player Arcade. Super Bay Drifters is the blue cabinet nearest the door. Walk out the door to leave.',7);
+    }catch(error){console.error('Arcade interior failed to load',error);notify('The arcade interior could not load. Please try again.',5);}
+    finally{arcadeTransition=false;arcadeFade.hidden=true;focusCanvas();}
+  }
+  /** Return to the main map on the porch, facing Foam Street. */
+  async function leaveArcade(){
+    if(!gym||!arcadeInside||arcadeTransition)return;
+    arcadeTransition=true;closeGame();clearInput();nearest=undefined;setPrompt();showFade('Back to Foam Street…');
+    try{
+      await paintLoadingStage();if(disposed||!gym)return;
+      const a=gym.arcade,position=a.porch.clone();
+      arcadeInside=false;gymScene.add(avatar.root);avatar.root.position.copy(position);avatar.root.rotation.y=a.yawStreet;makeController(position,true);frameGym();
+      camera.position.copy(orbit.target).add(new Vector3(Math.sin(a.yawStreet),0,Math.cos(a.yawStreet)).multiplyScalar(5.5)).add(new Vector3(0,2.6,0));orbit.update();
+      notify('Back outside on Foam Street.',3);
+    }finally{arcadeTransition=false;arcadeFade.hidden=true;focusCanvas();}
+  }
+  function openGame(){
+    if(!arcadeRoom||gameOpen)return;
+    const game=arcadeRoom.game;gameOpen=true;clearInput();closeEmotes();setPrompt();
+    gameOverlay.setAttribute('aria-label',game.name);gameOverlay.querySelector('strong')!.textContent=`${game.name} · ${game.publisher}`;
+    gameOverlay.querySelector('a')!.href=game.url;gameFrame.title=game.name;gameFrame.src=game.url;gameOverlay.hidden=false;
+    interacted.add(game.id);gameFrame.focus();
+  }
+  function closeGame(){
+    if(!gameOpen)return;gameOpen=false;gameOverlay.hidden=true;
+    // Unloading the frame stops the game's audio and network activity.
+    gameFrame.src='about:blank';clearInput();nearest=undefined;focusCanvas();
+  }
+  on('gym-arcade-visit','click',()=>visitArcade(true));on('gym-arcade-street','click',()=>visitArcade(false));
   on('gym-museum-visit','click',()=>visitMuseum());on('gym-museum-upper','click',()=>visitMuseum(true));
   on('gym-museum-overview','click',()=>{if(!gym)return;frameOverview();gym.museum.setView('exterior');orbit.target.copy(gym.museum.point(19,18,2));const distance=85/Math.min(1,camera.aspect);camera.near=.25;camera.position.copy(orbit.target).add(new Vector3(.25,.78,-1).normalize().multiplyScalar(distance));camera.updateProjectionMatrix();orbit.update();closeMenu();});
   function visitCaledonia(){
@@ -470,7 +531,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
     const distance=Math.max(350,200/camera.aspect)/(2*Math.tan(camera.fov*Math.PI/360));camera.position.copy(orbit.target).add(new Vector3(0,distance,.001));camera.near=1;camera.far=Math.max(2000,distance*4);camera.updateProjectionMatrix();
     (gymScene.fog as Fog).near=distance+200;(gymScene.fog as Fog).far=distance+1000;orbit.update();
   }
-  function visitDestination(next:GymDestination){if(next==='caledonia-park')visitCaledonia();else if(next==='museum')visitMuseum();else{returnRod();resetGym();closeMenu();}}
+  function visitDestination(next:GymDestination){if(next==='caledonia-park')visitCaledonia();else if(next==='museum')visitMuseum();else if(next==='arcade')visitArcade(false);else{returnRod();resetGym();closeMenu();}}
   on('gym-destination','change',()=>visitDestination($<HTMLSelectElement>('gym-destination').value as GymDestination));
   on('gym-caledonia-visit','click',visitCaledonia);
   on('gym-meals-visit','click',()=>{
@@ -589,7 +650,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
     let found:GymInteraction|undefined,best=Infinity;
     // Mid-hop is not a time to start an interaction; the prompt returns on landing.
     // The pier boarding prompt only appears while the dive boat is moored there.
-    if(!airborne)for(const item of gym.interactions){if(item.action==='board-dive'&&!gym.diveBoat.vessel.nearDock())continue;const d=Math.hypot(item.position.x-avatar.root.position.x,item.position.z-avatar.root.position.z);if(d<=item.radius&&d<best){best=d;found=item;}}
+    if(!airborne)for(const item of arcadeInside&&arcadeRoom?arcadeRoom.interactions:arcadeMode?gym.arcade.interactions:gym.interactions){if(item.action==='board-dive'&&!gym.diveBoat.vessel.nearDock())continue;const d=Math.hypot(item.position.x-avatar.root.position.x,item.position.z-avatar.root.position.z);if(d<=item.radius&&d<best){best=d;found=item;}}
     if(found!==nearest||found?.action==='gate'||!found){nearest=found;setPrompt(found?.action==='gate'?gym.poolGate.label:found?.label);}
     idleMessage(found?.description??'');
   }
@@ -623,6 +684,9 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
     else if(nearest.action==='cast'){equipRod();chooseEmote('cast');interactionMessage='Practice cast! Try the rod pose and reach; catching fish comes next.';}
     else if(nearest.action==='board'){boardBoat();}
     else if(nearest.action==='board-dive'){boardDiveBoat();return;}
+    else if(nearest.action==='enter'){void enterArcade();return;}
+    else if(nearest.action==='exit'){void leaveArcade();return;}
+    else if(nearest.action==='play'){openGame();return;}
     else{chooseEmote('wave');interactionMessage=nearest.description;}
     $('gym-message').textContent=interactionMessage;focusCanvas();
   }
@@ -630,6 +694,8 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
   on('gym-interact-alt','click',()=>{if(aboard){secondaryAboard();focusCanvas();}});
   window.addEventListener('keydown',e=>{
     if(active!=='gym'||!gymInitialized||gymFirstFramePending||e.altKey||e.ctrlKey||e.metaKey)return;
+    if(gameOpen){if(e.key==='Escape'){e.preventDefault();closeGame();}return;}
+    if(arcadeTransition)return;
     layout.classList.remove('uses-gamepad');
     const target=e.target as HTMLElement;if(target.closest('input,select,textarea,[role="tab"],summary,.gym-menu-panel')||target.isContentEditable)return;
     const emoteKey=GYM_EMOTES.find(([,,key])=>e.code==='Digit'+key)?.[0];
@@ -664,7 +730,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
           try{const module=await import('./enhancedWater');if(disposed)return;enhancedWater=module.createEnhancedWater(renderer,gym.water,gymSky,weather.environment,waterSettings);waterPanel.setOnChange(enhancedWater.setSettings);refreshNodeStyle(avatar.root,tier==='standard',weather.environment);}
           catch(error){console.warn('Enhanced water initialization failed',error);waterPanel.fail();return;}
         }
-        weather.environment.caustics.level.value=gym.water.root.position.y;gymLocal.add(gym.caledonia.root,gym.root,gym.reef.root,gym.whalePod.root,gym.waterfront.root,gym.museum.root);gymLocal.add(gym.coastalLife.root,gym.gulls.root,gym.seafloor.root,gym.squirrels.root);applyNodeStyle(gym.squirrels.root,tier==='standard',weather.environment);applyNodeStyle(gym.gulls.root,tier==='standard',weather.environment);applyNodeStyle(gym.seafloor.root,tier==='standard',weather.environment);applyNodeStyle(gym.coastalLife.root,tier==='standard',weather.environment);gym.coastalLife.swayKelp();applyNodeStyle(gym.caledonia.root,tier==='standard',weather.environment);applyNodeStyle(gym.museum.root,tier==='standard',weather.environment);applyNodeStyle(gym.waterfront.root,tier==='standard',weather.environment);applyNodeStyle(gym.root,tier==='standard',weather.environment);applyGymSurfaceStyle(gym.root,weather.environment);applyNodeStyle(gym.reef.root,tier==='standard',weather.environment);applyNodeStyle(gym.whalePod.root,tier==='standard',weather.environment);gym.reef.swayKelp();setGymLoading(gymHost,'Preparing Monterey Bay…');await paintLoadingStage();if(disposed)return;bayExtension=(await import('./testingGym/bayExtension')).createGymBayExtension(gym);if(disposed){bayExtension.dispose();return;}gymRegional.add(bayExtension.root);const places=$<HTMLSelectElement>('gym-bay-place');places.replaceChildren(new Option('Whole bay',''),...bayExtension.places.map(place=>new Option(place.name,place.id)));caledoniaLabels=(await import('./mapStudy/caledoniaLabels')).createCaledoniaLabels($('gym-viewport'),camera);bayLabels=(await import('./testingGym/bayLabels')).createGymBayLabels(gymHost.querySelector<HTMLElement>('.gym-layout')!,camera,bayExtension,id=>{bayFocusId=id;places.value=id;frameBayOverview();});applyNodeStyle(bayExtension.root,tier==='standard',weather.environment);
+        weather.environment.caustics.level.value=gym.water.root.position.y;gymLocal.add(gym.caledonia.root,gym.root,gym.reef.root,gym.whalePod.root,gym.waterfront.root,gym.museum.root,gym.arcade.root);gymLocal.add(gym.coastalLife.root,gym.gulls.root,gym.seafloor.root,gym.squirrels.root);applyNodeStyle(gym.squirrels.root,tier==='standard',weather.environment);applyNodeStyle(gym.gulls.root,tier==='standard',weather.environment);applyNodeStyle(gym.seafloor.root,tier==='standard',weather.environment);applyNodeStyle(gym.coastalLife.root,tier==='standard',weather.environment);gym.coastalLife.swayKelp();applyNodeStyle(gym.caledonia.root,tier==='standard',weather.environment);applyNodeStyle(gym.museum.root,tier==='standard',weather.environment);applyNodeStyle(gym.arcade.root,tier==='standard',weather.environment);applyNodeStyle(gym.waterfront.root,tier==='standard',weather.environment);applyNodeStyle(gym.root,tier==='standard',weather.environment);applyGymSurfaceStyle(gym.root,weather.environment);applyNodeStyle(gym.reef.root,tier==='standard',weather.environment);applyNodeStyle(gym.whalePod.root,tier==='standard',weather.environment);gym.reef.swayKelp();setGymLoading(gymHost,'Preparing Monterey Bay…');await paintLoadingStage();if(disposed)return;bayExtension=(await import('./testingGym/bayExtension')).createGymBayExtension(gym);if(disposed){bayExtension.dispose();return;}gymRegional.add(bayExtension.root);const places=$<HTMLSelectElement>('gym-bay-place');places.replaceChildren(new Option('Whole bay',''),...bayExtension.places.map(place=>new Option(place.name,place.id)));caledoniaLabels=(await import('./mapStudy/caledoniaLabels')).createCaledoniaLabels($('gym-viewport'),camera);bayLabels=(await import('./testingGym/bayLabels')).createGymBayLabels(gymHost.querySelector<HTMLElement>('.gym-layout')!,camera,bayExtension,id=>{bayFocusId=id;places.value=id;frameBayOverview();});applyNodeStyle(bayExtension.root,tier==='standard',weather.environment);
         deer=(await import('./testingGym/deer')).createGymDeer({floorAt:bayExtension.floorAt,waterAt:bayExtension.waterAt,colliders:gym.colliders});
         gymLocal.add(deer.root);applyNodeStyle(deer.root,tier==='standard',weather.environment);
         $<HTMLSelectElement>('gym-deer-place').replaceChildren(new Option('Choose a place',''),...deer.groups.map(group=>new Option(group.site.name,group.site.id)));
@@ -687,21 +753,21 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
     const dt=Math.min(.05,Math.max(0,(now-previous)/1000));previous=now;time+=dt;frameCount++;
     motion.reducedMotion=reduced.matches;
     if(active==='gym'&&gym&&controller){
-      const stick=pad.poll(),wheelOpen=!emoteMenu.hidden;
+      const stick=pad.poll(),wheelOpen=!emoteMenu.hidden,inputLocked=gameOpen||arcadeTransition;
       if(stick.active)layout.classList.add('uses-gamepad');
       if(pad.pressed(PAD.start))menu.open=!menu.open;
       // Gamepad: the wheel takes the stick while open; otherwise X interacts, Y opens the wheel, d-pad quick-emotes.
       if(wheelOpen){aimEmoteAt(stick.moveX,stick.moveY);if(pad.pressed(PAD.a)||pad.pressed(PAD.x)||pad.pressed(PAD.y))confirmEmote();else if(pad.pressed(PAD.b))closeEmotes(true);}
-      else if(stick.connected){
+      else if(stick.connected&&!inputLocked){
         if(pad.pressed(PAD.x))interact();
         if(pad.pressed(PAD.y)){if(aboard)secondaryAboard();else openEmotes();}
         for(const [button,value] of [[PAD.up,'wave'],[PAD.right,'cheer'],[PAD.down,'sit']] as const)if(pad.pressed(button))gymEmote(value);
       }
       if(!stickReleased&&Math.hypot(stick.moveX,stick.moveY)<.3)stickReleased=true;
-      const moveX=wheelOpen||!stickReleased?0:stick.moveX,moveY=wheelOpen||!stickReleased?0:stick.moveY;
+      const moveX=wheelOpen||inputLocked||!stickReleased?0:stick.moveX,moveY=wheelOpen||inputLocked||!stickReleased?0:stick.moveY;
       const clampAxis=(v:number)=>Math.max(-1,Math.min(1,v));
-      const horizontal=wheelOpen?0:clampAxis(Number(keys.has('KeyD')||keys.has('ArrowRight')||touchDirections.has('right'))-Number(keys.has('KeyA')||keys.has('ArrowLeft')||touchDirections.has('left'))+moveX);
-      const vertical=wheelOpen?0:clampAxis(Number(keys.has('KeyW')||keys.has('ArrowUp')||touchDirections.has('forward'))-Number(keys.has('KeyS')||keys.has('ArrowDown')||touchDirections.has('back'))-moveY);
+      const horizontal=wheelOpen||inputLocked?0:clampAxis(Number(keys.has('KeyD')||keys.has('ArrowRight')||touchDirections.has('right'))-Number(keys.has('KeyA')||keys.has('ArrowLeft')||touchDirections.has('left'))+moveX);
+      const vertical=wheelOpen||inputLocked?0:clampAxis(Number(keys.has('KeyW')||keys.has('ArrowUp')||touchDirections.has('forward'))-Number(keys.has('KeyS')||keys.has('ArrowDown')||touchDirections.has('back'))-moveY);
       if(ridingSurrey&&surrey){surrey.update(dt,vertical,horizontal);surrey.seat(avatar.root.position);avatar.root.position.y-=avatar.dimensions.seatedContactHeight;avatar.root.rotation.y=surrey.root.rotation.y;lastSpeed=surrey.speed;motion.speed=0;motion.swimming=motion.airborne=false;gym.update(reduced.matches?0:time);
       }else if(aboard){
         gym.diveBoat.vessel.update(dt,{throttle:vertical,steer:horizontal,fast:runToggle||keys.has('ShiftLeft')||keys.has('ShiftRight')||pad.held(PAD.b)});
@@ -715,9 +781,9 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
       }else{
         camera.getWorldDirection(forward);forward.y=0;forward.normalize();right.set(-forward.z,0,forward.x);
         input.x=right.x*horizontal+forward.x*vertical;input.z=right.z*horizontal+forward.z*vertical;input.run=runToggle||keys.has('ShiftLeft')||keys.has('ShiftRight')||pad.held(PAD.b);
-        input.jump=!wheelOpen&&(keys.has('Space')||jumpTouch||jumpLatch||pad.held(PAD.a));
+        input.jump=!wheelOpen&&!inputLocked&&(keys.has('Space')||jumpTouch||jumpLatch||pad.held(PAD.a));
         // B runs on land and dives in water; swimmers never run, so one button serves both.
-        input.dive=keys.has('KeyC')||diveTouch||pad.held(PAD.b);
+        input.dive=!inputLocked&&(keys.has('KeyC')||diveTouch||pad.held(PAD.b));
         // Getting up from a bench takes a fresh controller; the held jump then counts as a new press.
         if((horizontal||vertical||input.jump)&&seatReturn)chooseEmote('none');
         if(otterSuit&&flight&&(flight.active||input.jump||motion.swimming)){
@@ -740,7 +806,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
         else if(result.lowBreath&&!wasLowBreath)notify('Low breath! Swim up to the surface.',5);
         wasLowBreath=result.lowBreath;
         footShadow.visible=!result.swimming&&!result.wading;
-        const groundY=museumFloor==='upper'?MUSEUM_SITE.floor+MUSEUM_SITE.upper:gym.groundHeight(avatar.root.position.x,avatar.root.position.z);
+        const groundY=arcadeMode?gym.arcade.floorY:museumFloor==='upper'?MUSEUM_SITE.floor+MUSEUM_SITE.upper:gym.groundHeight(avatar.root.position.x,avatar.root.position.z);
         // The contact shadow stays on the ground and tightens with height: the clearest cue for judging a hop.
         const lift=Math.max(0,avatar.root.position.y-groundY),shadowScale=avatar.dimensions.controllerRadius/.28/(1+lift*1.6);
         footShadow.scale.setScalar(shadowScale);footShadow.position.set(avatar.root.position.x,groundY+.046,avatar.root.position.z);
@@ -752,9 +818,14 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
         const room=gym.museum.roomAt(avatar.root.position.x,avatar.root.position.z);
         gym.museum.setView(museumFloor==='upper'?'upper':room||avatar.root.position.distanceTo(gym.museum.entrance)<20?'ground':'exterior');
         const p=avatar.root.position;
-        const next:GymDestination=room||p.distanceTo(gym.museum.entrance)<35?'museum':gym.caledonia.containsDistrict(p.x,p.z)?'caledonia-park':'lovers-point';
+        const next:GymDestination=arcadeMode?'arcade':room||p.distanceTo(gym.museum.entrance)<35?'museum':gym.caledonia.containsDistrict(p.x,p.z)?'caledonia-park':'lovers-point';
+        if(arcadeMode&&!arcadeTransition){
+          // The doorway swaps screens: step inside to load the interior, step onto the porch to return.
+          if(arcadeInside){if(gym.arcade.crossedOut(p.x,p.z))void leaveArcade();}
+          else{gym.arcade.setView('exterior');if(gym.arcade.crossedIn(p.x,p.z))void enterArcade();}
+        }
         if(next!==destination)setDestination(next);
-        const title=gymHost.querySelector('.gym-place h1')!,place=museumFloor==='upper'?'Museum · mezzanine':DESTINATION_NAMES[destination];if(title.textContent!==place)title.textContent=place;
+        const title=gymHost.querySelector('.gym-place h1')!,place=museumFloor==='upper'?'Museum · mezzanine':arcadeInside?'2 Player Arcade · inside':DESTINATION_NAMES[destination];if(title.textContent!==place)title.textContent=place;
         // Follow the ground under a hop, not the hop itself, and ease toward the player instead of
         // locking rigidly. Reduced motion keeps the immediate follow without easing.
         followTarget.copy(avatar.root.position);if(airborne)followTarget.y=supportY;followTarget.y+=.9*avatar.dimensions.heightScale;
@@ -782,8 +853,8 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
       if(deer){deer.setPlayer(avatar.root.position.x,avatar.root.position.y,avatar.root.position.z,!overview&&!boating&&!aboard);
         deer.setViewer(overview?orbit.target.x:avatar.root.position.x,overview?orbit.target.z:avatar.root.position.z,!bayOverview);deer.update(dt,!reduced.matches);}
       if(!reduced.matches)weather.environment.caustics.time.value=time;
-      if(bayExtension&&!bayOverview)gymRegional.visible=!!deerViewId||!overview&&motion.flying&&(avatar.root.position.x<-200||avatar.root.position.x>1200||avatar.root.position.z<-700||avatar.root.position.z>650);
-      setUnderwater(!overview&&camera.position.y<gym.water.root.position.y);
+      if(bayExtension&&!bayOverview)gymRegional.visible=!!deerViewId||!overview&&arcadeMode&&!arcadeInside||!overview&&motion.flying&&(avatar.root.position.x<-200||avatar.root.position.x>1200||avatar.root.position.z<-700||avatar.root.position.z>650);
+      setUnderwater(!overview&&!arcadeInside&&camera.position.y<gym.water.root.position.y);
       gymSky.root.position.copy(camera.position);nearestInteraction();placeBreath();
     }else{motion.airborne=false;motion.landing=0;motion.swimming=pose==='swim'||pose==='tread';motion.speed=pose==='walk'?1.7:pose==='run'?3.5:pose==='swim'?AVATAR_SWIMMING.speed:0;lastSpeed=motion.speed;}
     if(emote!=='none'&&emote!=='sit'){emoteTime+=dt;if(emoteTime>3)chooseEmote('none');}
@@ -792,32 +863,32 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
     if(active==='gym'){weather.update({time,dt,underwater:enhancedWater?false:underwater,overview:overview||motion.flying,reducedMotion:reduced.matches,water:gym?.water});if(bayOverview){const fog=gymScene.fog as Fog;fog.near=95000;fog.far=180000;}if(weather.sun.intensity>.1)footShadow.visible=false;}
     lod.update(camera,renderer.domElement.clientHeight,dt);
     renderer.info.reset();
-    if(active==='gym'&&enhancedWater&&!bayOverview)enhancedWater.render(gymScene,camera);
-    else renderer.render(active==='gym'?gymScene:studio,camera);
+    if(active==='gym'&&enhancedWater&&!bayOverview&&!arcadeInside)enhancedWater.render(gymScene,camera);
+    else renderer.render(active==='gym'?gymStage():studio,camera);
     budgetTime+=dt;if(budgetTime>.6){budgetTime=0;budget();}
     if(active==='gym'){
-      if(gymFirstFramePending){gymFirstFramePending=false;setGymLoading(gymHost,'','ready');notify('Welcome to Lovers Point. Fishing gear is beside the rowboat.',5);diagnostics.reset();}
+      if(gymFirstFramePending){gymFirstFramePending=false;setGymLoading(gymHost,'','ready');notify(arcadeMode?'Welcome to 398 Foam Street. Suite A, the 2 Player Arcade, is the porch door with the shop decal.':'Welcome to Lovers Point. Fishing gear is beside the rowboat.',5);diagnostics.reset();}
       diagnostics.record(now,performance.now()-workStarted,renderer.info,studioHost.dataset.backend??'Preparing',renderer.domElement,renderer.getPixelRatio(),lod.mode);
     }
     frame=requestAnimationFrame(tick);
   }
   function resume(){if(initialized&&active&&!document.hidden&&!frame&&!disposed){previous=performance.now();diagnostics.reset();frame=requestAnimationFrame(tick);}}
   function setActive(view:ActiveView){
-    if(disposed)return;flushSizeChange();const changed=active!==view;if(changed&&active==='gym'){if(ridingSurrey)leaveSurrey(true);if(boating)leaveBoat(true);if(aboard)leaveDiveBoat('pier');swapGear(false);if(seatReturn)chooseEmote('none');controllerPosition.copy(avatar.root.position);gymControllerState=controller?.getState();returnRod();}
+    if(disposed)return;flushSizeChange();const changed=active!==view;if(changed&&active==='gym'){closeGame();if(ridingSurrey)leaveSurrey(true);if(boating)leaveBoat(true);if(aboard)leaveDiveBoat('pier');swapGear(false);if(seatReturn)chooseEmote('none');controllerPosition.copy(avatar.root.position);gymControllerState=controller?.getState();returnRod();}
     active=view;weather.setActive(view==='gym');clearInput();cancelAnimationFrame(frame);frame=0;
     if(!view){delete document.body.dataset.avatarView;return;}
     document.body.dataset.avatarView=view;
     (view==='avatars'?$('avatar-viewport'):$('gym-viewport')).append(renderer.domElement);
     renderer.domElement.setAttribute('aria-label',view==='avatars'?'Character preview. Drag to turn and scroll to zoom.':'Testing Gym. WASD or arrows to walk, swim and row. Space to jump. Shift to run or row faster. E to interact. 1, 2 and 3 to wave, cheer and sit. Diving uses breath; surface to reset it to 20 seconds. Drag to look.');
     resize();
-    if(changed){chooseEmote('none');if(view==='avatars'){studio.add(avatar.root);frameStudio();}else if(gymInitialized&&gym){gymScene.add(avatar.root);avatar.root.position.copy(controllerPosition.lengthSq()?controllerPosition:gym.spawn);makeController(undefined,false,gymControllerState);frameGym();}else{gymScene.add(avatar.root);void ensureGym();}}
+    if(changed){chooseEmote('none');if(view==='avatars'){studio.add(avatar.root);frameStudio();}else if(gymInitialized&&gym){gymStage().add(avatar.root);avatar.root.position.copy(controllerPosition.lengthSq()?controllerPosition:gym.spawn);makeController(undefined,false,gymControllerState);frameGym();}else{gymScene.add(avatar.root);void ensureGym();}}
     resume();
   }
   document.addEventListener('visibilitychange',()=>{clearInput();if(document.hidden){cancelAnimationFrame(frame);frame=0;}else resume();},{signal});
   reduced.addEventListener('change',()=>{orbit.enableDamping=!reduced.matches;},{signal});
   updateSizePresentation();updateSelections();updateLibrary();if(storageError)message(storageError);
   const ready=Promise.all([renderer.init(),lod.register(studio),lod.register(otterDive.mesh)]).then(()=>{if(disposed)return;initialized=true;studioHost.dataset.backend=gymHost.dataset.backend=(renderer.backend as unknown as {isWebGPUBackend?:boolean}).isWebGPUBackend?'WebGPU':'WebGL 2';resize();budget();resume();}).catch(error=>{gymFailed=true;setGymLoading(gymHost,'Graphics could not start. Please reload to try again.','error');showError(studioHost,`The 3D preview could not start: ${error instanceof Error?error.message:'please reload'}`);});
-  function getSnapshot(){return {waterGraphics:enhancedWater?.getSnapshot()??{mode:'balanced'},active,destination,overview,caledoniaOverview,deerViewId,deer:deer?.stats()??null,weather:weather.getSnapshot(),backend:studioHost.dataset.backend,frameCount,dirty,currentId,savedCount:collection.avatars.length,design:{...design},dimensions:{...avatar.dimensions},emote,pose,carrying:!!heldRod,swimming:motion.swimming,airborne,aboard,scuba,controller:(active==='gym'?controller?.getState():gymControllerState)??null,reef:gym?{active:gym.reef.active,...gym.reef.stats()}:null,diveBoatPosition:gym?gym.diveBoat.root.position.toArray():null,surrey:surrey?{riding:ridingSurrey,position:surrey.root.position.toArray(),heading:surrey.root.rotation.y,speed:surrey.speed,pedalPhase:surrey.crank.rotation.x}:null,boating,boat: gym ? {position:gym.boat.position.toArray(),heading:gym.vessel.heading,speed:gym.vessel.speed,nearDock:gym.vessel.nearDock()} : null,animation:avatar.getState(),speed:lastSpeed,position:avatar.root.position.toArray(),heading:avatar.root.rotation.y,otterSuit,flight:flight?.getState()??null,otterDive:otterDive.getState(),museum:gym?{floor:museumFloor,view:gym.museum.view,room:gym.museum.roomAt(avatar.root.position.x,avatar.root.position.z)}:null,squirrels:gym?.squirrels.stats()??null,coastalLife:gym?gym.coastalLife.stats():null,gulls:gym?gym.gulls.stats():null,whalePod:gym?gym.whalePod.stats():null,waterfront:gym?{name:gym.waterfront.root.name,bounds:gym.waterfront.bounds}:null,bay:bayExtension?{bounds:bayExtension.bounds,overview:bayOverview,focus:bayFocusId,regionalWaterVisible:gymRegional.visible&&bayExtension.ocean.visible}:null,interacted:[...interacted],nearest:nearest?.id,model:modelStats(avatar.mesh).model,lod:lod.stats(avatar.mesh),renderer:{drawCalls:renderer.info.render.drawCalls,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,geometries:renderer.info.memory.geometries},performance:diagnostics.getSnapshot(),gymReady:gymInitialized&&!gymFirstFramePending};}
-  function dispose(){if(disposed)return;cancelSizeChange();disposed=true;cancelAnimationFrame(frame);abort.abort();waterPanel.dispose();enhancedWater?.dispose();diagnostics.dispose();gymHost.querySelector('.gym-loading')?.remove();resizeObserver.disconnect();orbit.dispose();lod.dispose();otterDive.dispose();returnRod();avatar.dispose();bayLabels?.dispose();caledoniaLabels?.dispose();deer?.dispose();bayExtension?.dispose();surrey?.dispose();gym?.dispose();weather.dispose();for(const mesh of [plinth,contact,footShadow]){mesh.geometry.dispose();if(!Array.isArray(mesh.material))mesh.material.dispose();}renderer.dispose();delete document.body.dataset.avatarView;}
-  return {ready,renderer,camera,lod,weather,setActive,dispose,getSnapshot,get scene(){return active==='gym'?gymScene:studio;},get avatar(){return avatar;},get controller(){return controller;},get gym(){return gym;},get surrey(){return surrey;},get enhancedWater(){return enhancedWater;},get deer(){return deer;}};
+  function getSnapshot(){return {arcadeInside,gameOpen,waterGraphics:enhancedWater?.getSnapshot()??{mode:'balanced'},active,destination,overview,caledoniaOverview,deerViewId,deer:deer?.stats()??null,weather:weather.getSnapshot(),backend:studioHost.dataset.backend,frameCount,dirty,currentId,savedCount:collection.avatars.length,design:{...design},dimensions:{...avatar.dimensions},emote,pose,carrying:!!heldRod,swimming:motion.swimming,airborne,aboard,scuba,controller:(active==='gym'?controller?.getState():gymControllerState)??null,reef:gym?{active:gym.reef.active,...gym.reef.stats()}:null,diveBoatPosition:gym?gym.diveBoat.root.position.toArray():null,surrey:surrey?{riding:ridingSurrey,position:surrey.root.position.toArray(),heading:surrey.root.rotation.y,speed:surrey.speed,pedalPhase:surrey.crank.rotation.x}:null,boating,boat: gym ? {position:gym.boat.position.toArray(),heading:gym.vessel.heading,speed:gym.vessel.speed,nearDock:gym.vessel.nearDock()} : null,animation:avatar.getState(),speed:lastSpeed,position:avatar.root.position.toArray(),heading:avatar.root.rotation.y,otterSuit,flight:flight?.getState()??null,otterDive:otterDive.getState(),museum:gym?{floor:museumFloor,view:gym.museum.view,room:gym.museum.roomAt(avatar.root.position.x,avatar.root.position.z)}:null,squirrels:gym?.squirrels.stats()??null,coastalLife:gym?gym.coastalLife.stats():null,gulls:gym?gym.gulls.stats():null,whalePod:gym?gym.whalePod.stats():null,waterfront:gym?{name:gym.waterfront.root.name,bounds:gym.waterfront.bounds}:null,bay:bayExtension?{bounds:bayExtension.bounds,overview:bayOverview,focus:bayFocusId,regionalWaterVisible:gymRegional.visible&&bayExtension.ocean.visible}:null,interacted:[...interacted],nearest:nearest?.id,model:modelStats(avatar.mesh).model,lod:lod.stats(avatar.mesh),renderer:{drawCalls:renderer.info.render.drawCalls,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,geometries:renderer.info.memory.geometries},performance:diagnostics.getSnapshot(),gymReady:gymInitialized&&!gymFirstFramePending};}
+  function dispose(){if(disposed)return;cancelSizeChange();disposed=true;arcadeRoom?.dispose();gameFrame.src='about:blank';cancelAnimationFrame(frame);abort.abort();waterPanel.dispose();enhancedWater?.dispose();diagnostics.dispose();gymHost.querySelector('.gym-loading')?.remove();resizeObserver.disconnect();orbit.dispose();lod.dispose();otterDive.dispose();returnRod();avatar.dispose();bayLabels?.dispose();caledoniaLabels?.dispose();deer?.dispose();bayExtension?.dispose();surrey?.dispose();gym?.dispose();weather.dispose();for(const mesh of [plinth,contact,footShadow]){mesh.geometry.dispose();if(!Array.isArray(mesh.material))mesh.material.dispose();}renderer.dispose();delete document.body.dataset.avatarView;}
+  return {ready,renderer,camera,lod,weather,setActive,dispose,getSnapshot,get scene(){return active==='gym'?gymStage():studio;},get avatar(){return avatar;},get controller(){return controller;},get gym(){return gym;},get surrey(){return surrey;},get enhancedWater(){return enhancedWater;},get deer(){return deer;}};
 }

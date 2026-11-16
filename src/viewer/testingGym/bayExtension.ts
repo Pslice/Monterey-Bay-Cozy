@@ -10,7 +10,7 @@ const REGIONAL_WATER_LEVEL = -.3;
 
 export function createGymBayExtension(gym: ReturnType<typeof createTestingGym>) {
   const origin = GYM_GEOGRAPHY.origin;
-  const region = createBayRegion(origin, [loversPointFootprint(origin), waterfrontFootprint(origin), caledoniaFootprint(origin)]);
+  const region = createBayRegion(origin, [loversPointFootprint(origin), waterfrontFootprint(origin), caledoniaFootprint(origin), gym.arcade.regionFootprint]);
   region.root.name = 'Testing Gym · Monterey Bay regional map';
   const local = gym.flightBounds;
   const inLocalStudy = (x: number, z: number) => inCaledonia(x,z) || (x >= -140 && x <= local.maxX && z >= local.minZ && z <= local.maxZ);
@@ -20,10 +20,12 @@ export function createGymBayExtension(gym: ReturnType<typeof createTestingGym>) 
   ];
   const floorAt = (x: number, z: number) => {
     if (inLocalStudy(x, z)) return gym.flightFloor(x, z);
+    const arcadeFloor = gym.arcade.floorAt(x, z);
+    if (arcadeFloor !== undefined) return arcadeFloor;
     if (region.isLand(x, z)) return region.heightAt(x, z);
     return Math.min(-1, sampleRegionalGrid(BAY_REGION.bathy, ...sourcePoint(x, z)));
   };
-  const waterAt = (x: number, z: number) => inLocalStudy(x, z)
+  const waterAt = (x: number, z: number) => gym.arcade.contains(x, z) ? undefined : inLocalStudy(x, z)
     ? gym.flightWater(x, z)
     : region.isLand(x, z) ? undefined : REGIONAL_WATER_LEVEL;
   // Only the detailed local study owns a walking controller and dry-land collisions.

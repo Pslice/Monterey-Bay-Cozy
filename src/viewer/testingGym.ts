@@ -43,9 +43,10 @@ import { createGymReef } from './testingGym/reef';
 import { createGymButterflies } from './testingGym/butterflies';
 import { createGymWhaleSighting } from './testingGym/whalePod';
 import { createGymGulls } from './testingGym/gulls';
+import { createArcadeSite } from './testingGym/arcade';
 
 export type { GymBounds, GymCollider } from './avatarController';
-export interface GymInteraction { id: string; label: string; description: string; position: Vector3; radius: number; action: 'sit' | 'inspect' | 'collect' | 'cast' | 'board' | 'board-dive' | 'suit' | 'gate'; object?: Object3D; seatPosition?: Vector3; yaw?: number }
+export interface GymInteraction { id: string; label: string; description: string; position: Vector3; radius: number; action: 'sit' | 'inspect' | 'collect' | 'cast' | 'board' | 'board-dive' | 'suit' | 'gate' | 'enter' | 'exit' | 'play'; object?: Object3D; seatPosition?: Vector3; yaw?: number }
 
 /** Authored mooring off the end of the mapped concrete pier route (OSM way/633871951), which ends at
  * the shoreline. The stern faces the pier and the bow points out along the pier's axis. Local points
@@ -270,11 +271,13 @@ export function createTestingGym(options: { whaleSightingRoll?: number } = {}) {
   // The shared water shader supplies moving flecks; only the mapped shoreline needs geometry.
   root.add(finishStaticAsset(foam, 'gym-shore-water', [1,1,1], { rim: false, doubleSided: true }));
   const waterfront=createWaterfrontArea(),museum=createMuseumArea(),caledonia=createCaledoniaArea();
+  // 398 Foam Street is outside the walking outline: it owns a separate walking region, selected on arrival.
+  const arcade=createArcadeSite(); // its prompts stay in arcade.interactions, used only in its region
   const coastalLife=createCoastalLife(swim.swimGroundHeight,GYM_WATER_LEVEL);
   // Wildlife owns its animation and distance interest separately from the static park budget.
   const gulls=createGymGulls({groundHeight:accessHeight,surfaceY:GYM_WATER_LEVEL,isWater:coastalIsWater,
     canLandAt:(x,z)=>!coastalIsWater(x,z)&&canStandAt(x,z,bounds,colliders,.65)});
-  const flightObstacles=[...colliders.filter(c=>c.kind==='box').map(c=>Object.assign(c,{top:c.top??groundHeight((c.minX+c.maxX)/2,(c.minZ+c.maxZ)/2)+.6})),...waterfront.flightObstacles,...caledonia.flightObstacles,museum.flightObstacle];
+  const flightObstacles=[...colliders.filter(c=>c.kind==='box').map(c=>Object.assign(c,{top:c.top??groundHeight((c.minX+c.maxX)/2,(c.minZ+c.maxZ)/2)+.6})),...waterfront.flightObstacles,...caledonia.flightObstacles,museum.flightObstacle,...arcade.flightObstacles];
   colliders.push(...waterfront.colliders,...museum.colliders,...caledonia.colliders);
   bounds.minX=-430;bounds.maxX=1500;bounds.maxZ=900;
   bounds.walkable=[...WATERFRONT.coast.map(p=>[p[0],p[1]] as GymPoint).reverse(),...coast,[-140,-135],[-140,15],[-240,15],[-240,90],[-430,90],[-430,450],[-140,450],[-140,900]];
@@ -301,7 +304,7 @@ export function createTestingGym(options: { whaleSightingRoll?: number } = {}) {
   const butterflies=createGymButterflies(groundHeight,butterflyStatue.position);root.add(butterflies.root);
   let disposed = false;
   return {
-    poolGate,seafloor,reef,whalePod,butterflies,gulls,caledonia,waterfront,coastalLife,museum,otterSuit,flightObstacles,flightFloor,flightWater,flightBounds,
+    poolGate,seafloor,reef,whalePod,butterflies,gulls,caledonia,waterfront,coastalLife,museum,arcade,otterSuit,flightObstacles,flightFloor,flightWater,flightBounds,
     diveBoat: { root: diveBoat, visual: diveVisual, rack, deckPoint, vessel: diveVessel, stand: DIVE_BOAT.stand, ladderRadius: DIVE_BOAT.ladderRadius,
       get yaw() { return diveBoat.rotation.y; },
       /** Water-level points beside the (possibly driven) boat, in world metres. */
@@ -314,6 +317,6 @@ export function createTestingGym(options: { whaleSightingRoll?: number } = {}) {
       // The shader draws one wake: give it to whichever boat is moving faster.
       const wake = Math.abs(diveVessel.speed) > Math.abs(vessel.speed) ? diveVessel : vessel;
       water.setWake(wake.root.position.x-water.root.position.x,wake.root.position.z-water.root.position.z,wake.heading,wake.speed); } },
-    dispose() { if (disposed) return; disposed = true; squirrels.dispose(); butterflies.dispose(); gulls.dispose(); seafloor.dispose(); reef.dispose(); whalePod.dispose(); coastalLife.dispose(); waterfront.dispose(); caledonia.dispose(); museum.dispose(); water.dispose(); root.traverse(object => { if (object instanceof InstancedMesh) object.dispose(); }); disposeObject(root); },
+    dispose() { if (disposed) return; disposed = true; squirrels.dispose(); butterflies.dispose(); gulls.dispose(); seafloor.dispose(); reef.dispose(); whalePod.dispose(); coastalLife.dispose(); waterfront.dispose(); caledonia.dispose(); museum.dispose(); arcade.dispose(); water.dispose(); root.traverse(object => { if (object instanceof InstancedMesh) object.dispose(); }); disposeObject(root); },
   };
 }
