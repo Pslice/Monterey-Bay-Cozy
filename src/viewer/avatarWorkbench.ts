@@ -9,7 +9,7 @@ import type { createCaledoniaLabels } from './mapStudy/caledoniaLabels';
 import { MUSEUM_SITE } from '../data/pacificGroveMuseum';
 import { applyGymSurfaceStyle } from './gymSurfaceStyle';
 import './avatarWorkbench.css';
-import { CircleGeometry, CylinderGeometry, DirectionalLight, Fog, Group, HemisphereLight, Mesh, PCFShadowMap, PerspectiveCamera, Scene, Spherical, Vector3 } from 'three';
+import { CircleGeometry, CylinderGeometry, DirectionalLight, Fog, Group, HemisphereLight, Mesh, PCFShadowMap, PerspectiveCamera, Quaternion, Scene, Spherical, Vector3 } from 'three';
 import { createGamepadReader, PAD } from './gamepad';
 import { WebGPURenderer } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -391,9 +391,18 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
   const layout=gymHost.querySelector<HTMLElement>('.gym-layout')!;
   const arcadeFade=document.createElement('div');arcadeFade.className='gym-transition';arcadeFade.hidden=true;arcadeFade.setAttribute('role','status');arcadeFade.innerHTML='<p></p>';layout.append(arcadeFade);
   const gameOverlay=document.createElement('div');gameOverlay.className='gym-arcade-game';gameOverlay.hidden=true;gameOverlay.setAttribute('role','dialog');gameOverlay.setAttribute('aria-modal','true');
-  gameOverlay.innerHTML='<div class="gym-arcade-game-bar"><strong></strong><a target="_blank" rel="noopener noreferrer">Open in a new tab ↗</a><button type="button">Close <kbd>Esc</kbd></button></div><iframe allow="fullscreen; gamepad; autoplay" allowfullscreen></iframe><p class="gym-arcade-game-note">Blank screen? The game’s site may not allow embedding. Use “Open in a new tab”.</p>';
-  layout.append(gameOverlay);gameOverlay.querySelector('button')!.addEventListener('click',()=>closeGame(),{signal});
+  // The game plays "inside" the cabinet: the camera dollies up to the glass, then the iframe is laid
+  // exactly over the glass's projected rectangle. Only the bar, the frame and the note take input.
+  gameOverlay.innerHTML='<div class="gym-arcade-game-bar"><strong></strong><button type="button" data-game="fullscreen">Full screen</button><a target="_blank" rel="noopener noreferrer">Open in a new tab ↗</a><button type="button" data-game="close">Close <kbd>Esc</kbd></button></div><iframe allow="fullscreen; gamepad; autoplay" allowfullscreen></iframe><p class="gym-arcade-game-note">Blank screen? The game’s site may not allow embedding. Use “Open in a new tab”.</p>';
+  layout.append(gameOverlay);
   const gameFrame=gameOverlay.querySelector('iframe')!;
+  gameOverlay.querySelector('[data-game="close"]')!.addEventListener('click',()=>closeGame(),{signal});
+  gameOverlay.querySelector('[data-game="fullscreen"]')!.addEventListener('click',()=>{void gameFrame.requestFullscreen?.().catch(()=>{});},{signal});
+  /** 0 = normal follow camera, 1 = parked in front of the cabinet glass. Eased in `placeCabinetCamera`. */
+  let cabinetBlend=0,cabinetPoseApplied=false,gameFrameShown=false,gameRect='';
+  const orbitPose=new Vector3(),orbitQuat=new Quaternion(),cabinetPos=new Vector3(),cabinetQuat=new Quaternion(),cabinetLook=new Vector3(),screenCorner=new Vector3();
+  /** Fraction of the view's limiting dimension filled by the glass; the rest shows the bezel, marquee and controls. */
+  const CABINET_FILL=.56;
   layout.classList.toggle('uses-touch',matchMedia('(pointer: coarse)').matches);
   gymHost.addEventListener('pointerdown',e=>{layout.classList.remove('uses-gamepad');if(e.pointerType==='touch')layout.classList.add('uses-touch');else if(e.pointerType==='mouse')layout.classList.remove('uses-touch');},{signal,capture:true});
   // A pointer click on a HUD button hands focus back to the world so Space/WASD keep playing.
@@ -425,7 +434,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
     if(!overview)$('gym-overview').textContent=next==='caledonia-park'?'Caledonia overview':'Park overview';
   }
   function frameGym(){if(!gym)return;deerViewId='';caledoniaOverview=false;setUnderwater(false);overview=false;bayOverview=false;gymHost.querySelector('.gym-layout')?.classList.remove('is-bay-overview');gymLocal.visible=true;if(bayExtension){gymRegional.visible=false;bayExtension.setDetailed(true);}gym.water.root.visible=true;$('gym-bay-overview').setAttribute('aria-pressed','false');camera.near=.25;camera.far=3500;(gymScene.fog as Fog).near=160;(gymScene.fog as Fog).far=480;$('gym-overview').setAttribute('aria-pressed','false');$('gym-overview').textContent=destination==='caledonia-park'?'Caledonia overview':'Park overview';orbit.minDistance=3.5;orbit.maxDistance=otterSuit?45:17;orbit.minPolarAngle=.35;orbit.maxPolarAngle=Math.PI*.46;orbit.target.copy(avatar.root.position).add(new Vector3(0,.9*avatar.dimensions.heightScale,0));camera.fov=49;camera.position.copy(orbit.target).add(new Vector3(-4.5,3.2,6));camera.updateProjectionMatrix();orbit.update();}
-  function resetGym(){if(!gym)return;ridingSurrey=false;surrey?.stop();boatControls(false);setDestination('lovers-point');museumFloor=null;gym.museum.setView('exterior');closeGame();if(arcadeInside){arcadeInside=false;gymScene.add(avatar.root);}arcadeMode=false;gym.arcade.setView('exterior');if(ridingSurrey)leaveSurrey(true);if(boating)leaveBoat(true);if(aboard)leaveDiveBoat('pier');gym.diveBoat.vessel.reset();swapGear(false);gym.vessel.reset();clearInput();chooseEmote('none');avatar.root.position.copy(gym.spawn);avatar.root.rotation.set(0,0,0);makeController(undefined,true);motion.swimming=false;airborne=false;swimControls(false);wasLowBreath=false;footShadow.visible=true;frameGym();notify('Back at the park entrance.',3);focusCanvas();}
+  function resetGym(){if(!gym)return;ridingSurrey=false;surrey?.stop();boatControls(false);setDestination('lovers-point');museumFloor=null;gym.museum.setView('exterior');closeGame(true);if(arcadeInside){arcadeInside=false;gymScene.add(avatar.root);}arcadeMode=false;gym.arcade.setView('exterior');if(ridingSurrey)leaveSurrey(true);if(boating)leaveBoat(true);if(aboard)leaveDiveBoat('pier');gym.diveBoat.vessel.reset();swapGear(false);gym.vessel.reset();clearInput();chooseEmote('none');avatar.root.position.copy(gym.spawn);avatar.root.rotation.set(0,0,0);makeController(undefined,true);motion.swimming=false;airborne=false;swimControls(false);wasLowBreath=false;footShadow.visible=true;frameGym();notify('Back at the park entrance.',3);focusCanvas();}
   function frameOverview(){
     if(!gym)return;deerViewId='';caledoniaOverview=false;
     setUnderwater(false);overview=true;bayOverview=false;gymHost.querySelector('.gym-layout')?.classList.remove('is-bay-overview');gymLocal.visible=true;if(bayExtension){gymRegional.visible=false;bayExtension.setDetailed(true);}gym.water.root.visible=true;$('gym-bay-overview').setAttribute('aria-pressed','false');orbit.maxDistance=2200;orbit.maxPolarAngle=Math.PI*.46;
@@ -489,14 +498,14 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
       footShadow.visible=false;frameGym();orbit.minDistance=1.6;orbit.maxDistance=5;
       // Start from the front-right of the room, like the interior photograph, looking toward the cabinets.
       camera.position.copy(a.photoView.position);orbit.update();
-      notify('Inside the 2 Player Arcade. Super Bay Drifters is the blue cabinet nearest the door. Walk out the door to leave.',7);
+      notify('Inside the 2 Player Arcade. Super Bay Drifters is the lone red cabinet across the room. Walk out the door to leave.',7);
     }catch(error){console.error('Arcade interior failed to load',error);notify('The arcade interior could not load. Please try again.',5);}
     finally{arcadeTransition=false;arcadeFade.hidden=true;focusCanvas();}
   }
   /** Return to the main map on the porch, facing Foam Street. */
   async function leaveArcade(){
     if(!gym||!arcadeInside||arcadeTransition)return;
-    arcadeTransition=true;closeGame();clearInput();nearest=undefined;setPrompt();showFade('Back to Foam Street…');
+    arcadeTransition=true;closeGame(true);clearInput();nearest=undefined;setPrompt();showFade('Back to Foam Street…');
     try{
       await paintLoadingStage();if(disposed||!gym)return;
       const a=gym.arcade,position=a.porch.clone();
@@ -507,15 +516,55 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
   }
   function openGame(){
     if(!arcadeRoom||gameOpen)return;
-    const game=arcadeRoom.game;gameOpen=true;clearInput();closeEmotes();setPrompt();
+    const game=arcadeRoom.game;gameOpen=true;clearInput();closeEmotes();chooseEmote('none');setPrompt();
     gameOverlay.setAttribute('aria-label',game.name);gameOverlay.querySelector('strong')!.textContent=`${game.name} · ${game.publisher}`;
+    // Start loading while the camera moves in; the frame appears once it reaches the glass.
     gameOverlay.querySelector('a')!.href=game.url;gameFrame.title=game.name;gameFrame.src=game.embedUrl;gameOverlay.hidden=false;
-    interacted.add(game.id);gameFrame.focus();
+    gameFrameShown=false;gameRect='';gameFrame.classList.remove('is-live');layout.classList.add('is-playing-arcade');orbit.enabled=false;
+    interacted.add(game.id);
   }
-  function closeGame(){
-    if(!gameOpen)return;gameOpen=false;gameOverlay.hidden=true;
+  /** Close the game. The camera eases back to the player unless `immediate` (screen changes, resets). */
+  function closeGame(immediate=false){
+    if(immediate){if(cabinetPoseApplied){camera.position.copy(orbitPose);camera.quaternion.copy(orbitQuat);}cabinetBlend=0;cabinetPoseApplied=false;avatar.root.visible=true;}
+    if(!gameOpen)return;gameOpen=false;gameOverlay.hidden=true;gameFrameShown=false;gameFrame.classList.remove('is-live');
+    layout.classList.remove('is-playing-arcade');orbit.enabled=true;
+    if(document.fullscreenElement===gameFrame)void document.exitFullscreen().catch(()=>{});
     // Unloading the frame stops the game's audio and network activity.
     gameFrame.src='about:blank';clearInput();nearest=undefined;focusCanvas();
+  }
+  /** Undo last frame's cabinet camera so the follow camera and controls see their own pose. */
+  function restoreOrbitPose(){if(!cabinetPoseApplied)return;camera.position.copy(orbitPose);camera.quaternion.copy(orbitQuat);cabinetPoseApplied=false;}
+  /** Ease between the follow camera and a head-on view of the cabinet glass, then lay the iframe over the glass. */
+  function placeCabinetCamera(dt:number){
+    const screen=arcadeRoom?.screen;
+    if(!screen||!arcadeInside){cabinetBlend=0;avatar.root.visible=true;return;}
+    cabinetBlend=reduced.matches?Number(gameOpen):Math.max(0,Math.min(1,cabinetBlend+(gameOpen?dt:-dt)/.85));
+    avatar.root.visible=cabinetBlend<.5;
+    if(cabinetBlend<=0)return;
+    // Head-on: the view direction is the glass normal, so the glass projects to an exact
+    // axis-aligned rectangle. The camera sits slightly above centre so the marquee's lower edge shows.
+    const tanHalf=Math.tan(camera.fov*Math.PI/360);
+    const distance=Math.max(screen.height/(2*tanHalf*CABINET_FILL),screen.width/(2*tanHalf*camera.aspect*CABINET_FILL));
+    cabinetPos.copy(screen.centre).addScaledVector(screen.normal,distance);cabinetPos.y+=distance*.12;
+    cabinetLook.copy(cabinetPos).sub(screen.normal);
+    orbitPose.copy(camera.position);orbitQuat.copy(camera.quaternion);
+    camera.position.copy(cabinetPos);camera.lookAt(cabinetLook);cabinetQuat.copy(camera.quaternion);
+    const k=cabinetBlend*cabinetBlend*(3-2*cabinetBlend);
+    camera.position.lerpVectors(orbitPose,cabinetPos,k);camera.quaternion.slerpQuaternions(orbitQuat,cabinetQuat,k);camera.updateMatrixWorld();
+    cabinetPoseApplied=true;
+    if(gameOpen&&cabinetBlend>=1)placeGameFrame();
+  }
+  function placeGameFrame(){
+    const screen=arcadeRoom!.screen,canvas=renderer.domElement.getBoundingClientRect(),host=gameOverlay.getBoundingClientRect();
+    let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+    for(const [u,v] of [[-1,-1],[1,-1],[1,1],[-1,1]]){
+      screenCorner.copy(screen.centre).addScaledVector(screen.right,u*screen.width/2);screenCorner.y+=v*screen.height/2;screenCorner.project(camera);
+      const x=(screenCorner.x*.5+.5)*canvas.width,y=(-screenCorner.y*.5+.5)*canvas.height;
+      x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);
+    }
+    const left=Math.round(canvas.left-host.left+x0),top=Math.round(canvas.top-host.top+y0),width=Math.round(x1-x0),height=Math.round(y1-y0),key=`${left},${top},${width},${height}`;
+    if(key!==gameRect){gameRect=key;Object.assign(gameFrame.style,{left:`${left}px`,top:`${top}px`,width:`${width}px`,height:`${height}px`});}
+    if(!gameFrameShown){gameFrameShown=true;gameFrame.classList.add('is-live');gameFrame.focus();}
   }
   on('gym-arcade-visit','click',()=>visitArcade(true));on('gym-arcade-street','click',()=>visitArcade(false));
   on('gym-museum-visit','click',()=>visitMuseum());on('gym-museum-upper','click',()=>visitMuseum(true));
@@ -752,10 +801,11 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
     const workStarted=performance.now();
     const dt=Math.min(.05,Math.max(0,(now-previous)/1000));previous=now;time+=dt;frameCount++;
     motion.reducedMotion=reduced.matches;
+    restoreOrbitPose();
     if(active==='gym'&&gym&&controller){
-      const stick=pad.poll(),wheelOpen=!emoteMenu.hidden,inputLocked=gameOpen||arcadeTransition;
+      const stick=pad.poll(),wheelOpen=!emoteMenu.hidden,inputLocked=gameOpen||cabinetBlend>0||arcadeTransition;
       if(stick.active)layout.classList.add('uses-gamepad');
-      if(pad.pressed(PAD.start))menu.open=!menu.open;
+      if(pad.pressed(PAD.start)&&!inputLocked)menu.open=!menu.open;
       // Gamepad: the wheel takes the stick while open; otherwise X interacts, Y opens the wheel, d-pad quick-emotes.
       if(wheelOpen){aimEmoteAt(stick.moveX,stick.moveY);if(pad.pressed(PAD.a)||pad.pressed(PAD.x)||pad.pressed(PAD.y))confirmEmote();else if(pad.pressed(PAD.b))closeEmotes(true);}
       else if(stick.connected&&!inputLocked){
@@ -858,7 +908,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
       gymSky.root.position.copy(camera.position);nearestInteraction();placeBreath();
     }else{motion.airborne=false;motion.landing=0;motion.swimming=pose==='swim'||pose==='tread';motion.speed=pose==='walk'?1.7:pose==='run'?3.5:pose==='swim'?AVATAR_SWIMMING.speed:0;lastSpeed=motion.speed;}
     if(emote!=='none'&&emote!=='sit'){emoteTime+=dt;if(emoteTime>3)chooseEmote('none');}
-    motion.pedalPhase=ridingSurrey?surrey?.crank.rotation.x:undefined;motion.emote=emote;avatar.update(dt,motion);orbit.update();bayLabels?.update(active==='gym'&&bayOverview);caledoniaLabels?.update(active==='gym'&&overview&&!bayOverview&&caledoniaOverview);
+    motion.pedalPhase=ridingSurrey?surrey?.crank.rotation.x:undefined;motion.emote=emote;avatar.update(dt,motion);orbit.update();if(active==='gym')placeCabinetCamera(dt);bayLabels?.update(active==='gym'&&bayOverview);caledoniaLabels?.update(active==='gym'&&overview&&!bayOverview&&caledoniaOverview);
     otterDive.update(dt,avatar,active==='gym'&&otterSuit,motion.submerged,motion.boosting,reduced.matches,gym?.water.root.position.y??1);
     if(active==='gym'){weather.update({time,dt,underwater:enhancedWater?false:underwater,overview:overview||motion.flying,reducedMotion:reduced.matches,water:gym?.water});if(bayOverview){const fog=gymScene.fog as Fog;fog.near=95000;fog.far=180000;}if(weather.sun.intensity>.1)footShadow.visible=false;}
     lod.update(camera,renderer.domElement.clientHeight,dt);
@@ -874,7 +924,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
   }
   function resume(){if(initialized&&active&&!document.hidden&&!frame&&!disposed){previous=performance.now();diagnostics.reset();frame=requestAnimationFrame(tick);}}
   function setActive(view:ActiveView){
-    if(disposed)return;flushSizeChange();const changed=active!==view;if(changed&&active==='gym'){closeGame();if(ridingSurrey)leaveSurrey(true);if(boating)leaveBoat(true);if(aboard)leaveDiveBoat('pier');swapGear(false);if(seatReturn)chooseEmote('none');controllerPosition.copy(avatar.root.position);gymControllerState=controller?.getState();returnRod();}
+    if(disposed)return;flushSizeChange();const changed=active!==view;if(changed&&active==='gym'){closeGame(true);if(ridingSurrey)leaveSurrey(true);if(boating)leaveBoat(true);if(aboard)leaveDiveBoat('pier');swapGear(false);if(seatReturn)chooseEmote('none');controllerPosition.copy(avatar.root.position);gymControllerState=controller?.getState();returnRod();}
     active=view;weather.setActive(view==='gym');clearInput();cancelAnimationFrame(frame);frame=0;
     if(!view){delete document.body.dataset.avatarView;return;}
     document.body.dataset.avatarView=view;
@@ -888,7 +938,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
   reduced.addEventListener('change',()=>{orbit.enableDamping=!reduced.matches;},{signal});
   updateSizePresentation();updateSelections();updateLibrary();if(storageError)message(storageError);
   const ready=Promise.all([renderer.init(),lod.register(studio),lod.register(otterDive.mesh)]).then(()=>{if(disposed)return;initialized=true;studioHost.dataset.backend=gymHost.dataset.backend=(renderer.backend as unknown as {isWebGPUBackend?:boolean}).isWebGPUBackend?'WebGPU':'WebGL 2';resize();budget();resume();}).catch(error=>{gymFailed=true;setGymLoading(gymHost,'Graphics could not start. Please reload to try again.','error');showError(studioHost,`The 3D preview could not start: ${error instanceof Error?error.message:'please reload'}`);});
-  function getSnapshot(){return {arcadeInside,gameOpen,waterGraphics:enhancedWater?.getSnapshot()??{mode:'balanced'},active,destination,overview,caledoniaOverview,deerViewId,deer:deer?.stats()??null,weather:weather.getSnapshot(),backend:studioHost.dataset.backend,frameCount,dirty,currentId,savedCount:collection.avatars.length,design:{...design},dimensions:{...avatar.dimensions},emote,pose,carrying:!!heldRod,swimming:motion.swimming,airborne,aboard,scuba,controller:(active==='gym'?controller?.getState():gymControllerState)??null,reef:gym?{active:gym.reef.active,...gym.reef.stats()}:null,diveBoatPosition:gym?gym.diveBoat.root.position.toArray():null,surrey:surrey?{riding:ridingSurrey,position:surrey.root.position.toArray(),heading:surrey.root.rotation.y,speed:surrey.speed,pedalPhase:surrey.crank.rotation.x}:null,boating,boat: gym ? {position:gym.boat.position.toArray(),heading:gym.vessel.heading,speed:gym.vessel.speed,nearDock:gym.vessel.nearDock()} : null,animation:avatar.getState(),speed:lastSpeed,position:avatar.root.position.toArray(),heading:avatar.root.rotation.y,otterSuit,flight:flight?.getState()??null,otterDive:otterDive.getState(),museum:gym?{floor:museumFloor,view:gym.museum.view,room:gym.museum.roomAt(avatar.root.position.x,avatar.root.position.z)}:null,squirrels:gym?.squirrels.stats()??null,coastalLife:gym?gym.coastalLife.stats():null,gulls:gym?gym.gulls.stats():null,whalePod:gym?gym.whalePod.stats():null,waterfront:gym?{name:gym.waterfront.root.name,bounds:gym.waterfront.bounds}:null,bay:bayExtension?{bounds:bayExtension.bounds,overview:bayOverview,focus:bayFocusId,regionalWaterVisible:gymRegional.visible&&bayExtension.ocean.visible}:null,interacted:[...interacted],nearest:nearest?.id,model:modelStats(avatar.mesh).model,lod:lod.stats(avatar.mesh),renderer:{drawCalls:renderer.info.render.drawCalls,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,geometries:renderer.info.memory.geometries},performance:diagnostics.getSnapshot(),gymReady:gymInitialized&&!gymFirstFramePending};}
+  function getSnapshot(){return {arcadeInside,gameOpen,cabinetView:{blend:cabinetBlend,frameShown:gameFrameShown,frameRect:gameRect},waterGraphics:enhancedWater?.getSnapshot()??{mode:'balanced'},active,destination,overview,caledoniaOverview,deerViewId,deer:deer?.stats()??null,weather:weather.getSnapshot(),backend:studioHost.dataset.backend,frameCount,dirty,currentId,savedCount:collection.avatars.length,design:{...design},dimensions:{...avatar.dimensions},emote,pose,carrying:!!heldRod,swimming:motion.swimming,airborne,aboard,scuba,controller:(active==='gym'?controller?.getState():gymControllerState)??null,reef:gym?{active:gym.reef.active,...gym.reef.stats()}:null,diveBoatPosition:gym?gym.diveBoat.root.position.toArray():null,surrey:surrey?{riding:ridingSurrey,position:surrey.root.position.toArray(),heading:surrey.root.rotation.y,speed:surrey.speed,pedalPhase:surrey.crank.rotation.x}:null,boating,boat: gym ? {position:gym.boat.position.toArray(),heading:gym.vessel.heading,speed:gym.vessel.speed,nearDock:gym.vessel.nearDock()} : null,animation:avatar.getState(),speed:lastSpeed,position:avatar.root.position.toArray(),heading:avatar.root.rotation.y,otterSuit,flight:flight?.getState()??null,otterDive:otterDive.getState(),museum:gym?{floor:museumFloor,view:gym.museum.view,room:gym.museum.roomAt(avatar.root.position.x,avatar.root.position.z)}:null,squirrels:gym?.squirrels.stats()??null,coastalLife:gym?gym.coastalLife.stats():null,gulls:gym?gym.gulls.stats():null,whalePod:gym?gym.whalePod.stats():null,waterfront:gym?{name:gym.waterfront.root.name,bounds:gym.waterfront.bounds}:null,bay:bayExtension?{bounds:bayExtension.bounds,overview:bayOverview,focus:bayFocusId,regionalWaterVisible:gymRegional.visible&&bayExtension.ocean.visible}:null,interacted:[...interacted],nearest:nearest?.id,model:modelStats(avatar.mesh).model,lod:lod.stats(avatar.mesh),renderer:{drawCalls:renderer.info.render.drawCalls,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,geometries:renderer.info.memory.geometries},performance:diagnostics.getSnapshot(),gymReady:gymInitialized&&!gymFirstFramePending};}
   function dispose(){if(disposed)return;cancelSizeChange();disposed=true;arcadeRoom?.dispose();gameFrame.src='about:blank';cancelAnimationFrame(frame);abort.abort();waterPanel.dispose();enhancedWater?.dispose();diagnostics.dispose();gymHost.querySelector('.gym-loading')?.remove();resizeObserver.disconnect();orbit.dispose();lod.dispose();otterDive.dispose();returnRod();avatar.dispose();bayLabels?.dispose();caledoniaLabels?.dispose();deer?.dispose();bayExtension?.dispose();surrey?.dispose();gym?.dispose();weather.dispose();for(const mesh of [plinth,contact,footShadow]){mesh.geometry.dispose();if(!Array.isArray(mesh.material))mesh.material.dispose();}renderer.dispose();delete document.body.dataset.avatarView;}
-  return {ready,renderer,camera,lod,weather,setActive,dispose,getSnapshot,get scene(){return active==='gym'?gymStage():studio;},get avatar(){return avatar;},get controller(){return controller;},get gym(){return gym;},get surrey(){return surrey;},get enhancedWater(){return enhancedWater;},get deer(){return deer;}};
+  return {ready,renderer,camera,lod,weather,setActive,dispose,getSnapshot,get scene(){return active==='gym'?gymStage():studio;},get avatar(){return avatar;},get controller(){return controller;},get arcadeRoom(){return arcadeRoom;},get gym(){return gym;},get surrey(){return surrey;},get enhancedWater(){return enhancedWater;},get deer(){return deer;}};
 }
