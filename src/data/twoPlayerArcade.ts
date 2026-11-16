@@ -110,7 +110,15 @@ export function arcadeToLocal(x: number, z: number): GymPoint {
   return [dx * along[0] + dz * along[1], dx * front[0] + dz * front[1]];
 }
 
-/** Playable cabinets. The game runs in an iframe overlay from its own site; nothing is bundled. */
+/** Playable cabinets. The game runs in an iframe overlay from its own site; nothing is bundled.
+ * `embedUrl` is the publisher's embed page (their documented `<iframe>` snippet: 16:9,
+ * `allow="autoplay; fullscreen"`); `url` is the full game page used by the "open in a new tab"
+ * fallback. Checked November 16, 2026: `/embed` returned 404 and both pages sent
+ * `X-Frame-Options: DENY`, so the fallback link stays until the embed page is live. */
 export const ARCADE_GAMES = [
-  { id: 'super-bay-drifters', name: 'Super Bay Drifters', cabinetIndex: 0, url: 'https://montereybaygames.com/play/super-bay-drifters/index.html?v=99dbe18712', publisher: 'Monterey Bay Games' },
+  {
+    id: 'super-bay-drifters', name: 'Super Bay Drifters', cabinetIndex: 0, publisher: 'Monterey Bay Games',
+    embedUrl: 'https://montereybaygames.com/play/super-bay-drifters/embed',
+    url: 'https://montereybaygames.com/play/super-bay-drifters/index.html?v=99dbe18712',
+  },
 ] as const;
