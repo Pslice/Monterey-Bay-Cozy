@@ -117,7 +117,8 @@ export function arcadeToLocal(x: number, z: number): GymPoint {
  * `X-Frame-Options: DENY`, so the fallback link stays until the embed page is live. */
 export const ARCADE_GAMES = [
   {
-    id: 'super-bay-drifters', name: 'Super Bay Drifters', cabinetIndex: 0, publisher: 'Monterey Bay Games',
+    /** `red` is the lone cabinet on the right-hand wall, across the room from the entrance. */
+    id: 'super-bay-drifters', name: 'Super Bay Drifters', cabinet: 'red', publisher: 'Monterey Bay Games',
     embedUrl: 'https://montereybaygames.com/play/super-bay-drifters/embed',
     url: 'https://montereybaygames.com/play/super-bay-drifters/index.html?v=99dbe18712',
   },
