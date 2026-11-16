@@ -58,16 +58,32 @@ try {
     await shoot('interior-eye', [20.6, -3.9], [22.9, -.9, 1.7], 1200);
     await shoot('interior-cabinets', [17.3, -4.2], [19.6, -2.0, 2.2], 1200);
 
-    // Play Super Bay Drifters at the blue cabinet: E opens the overlay with the game iframe.
-    await p.evaluate(() => { const w = qaViewer.avatarWorkbench, g = w.gym.arcade, at = g.point(16.25, -2.95, .045); w.controller.restoreState({ ...w.controller.getState(), position: at.toArray(), velocity: [0, 0] }); return true; });
+    // Play Super Bay Drifters at the lone red cabinet across from the entrance: E dollies the
+    // camera to the glass and lays the game iframe exactly over it.
+    await p.evaluate(() => { const w = qaViewer.avatarWorkbench, g = w.gym.arcade, at = g.point(23.27, -2.35, .045); w.controller.restoreState({ ...w.controller.getState(), position: at.toArray(), velocity: [0, 0] }); return true; });
     await p.waitForTimeout(500); await p.locator('#gym-viewport canvas').focus(); await p.keyboard.press('e');
-    await p.waitForFunction(() => qaViewer.avatarWorkbench.getSnapshot().gameOpen, null, { timeout: 5000 });
-    const game = await p.evaluate(() => { const o = document.querySelector('.gym-arcade-game'), f = o.querySelector('iframe'); return { visible: !o.hidden, src: f.src, title: f.title, link: o.querySelector('a').href }; });
-    assert(game.visible && game.src.startsWith('https://montereybaygames.com/play/super-bay-drifters/index.html') && game.link === game.src, JSON.stringify(game));
-    await p.waitForTimeout(3500); await p.screenshot({ path: `${out}/${backend}-game-overlay.png` });
-    await p.locator('.gym-arcade-game-bar button').click();
-    const closed = await p.evaluate(() => ({ open: qaViewer.avatarWorkbench.getSnapshot().gameOpen, src: document.querySelector('.gym-arcade-game iframe').src }));
-    assert(!closed.open && closed.src === 'about:blank', JSON.stringify(closed));
+    await p.waitForFunction(() => { const s = qaViewer.avatarWorkbench.getSnapshot(); return s.gameOpen && s.cabinetView.frameShown; }, null, { timeout: 8000 });
+    await p.waitForTimeout(600);
+    const game = await p.evaluate(() => {
+      const w = qaViewer.avatarWorkbench, o = document.querySelector('.gym-arcade-game'), f = o.querySelector('iframe'), r = f.getBoundingClientRect(), c = w.renderer.domElement.getBoundingClientRect();
+      const glass = w.arcadeRoom.screen, centre = glass.centre.clone().project(w.camera);
+      return { visible: !o.hidden && getComputedStyle(f).visibility === 'visible', src: f.src, title: f.title, link: o.querySelector('a').href, avatarHidden: !w.avatar.root.visible,
+        rect: [r.left, r.top, r.width, r.height].map(Math.round), aspect: r.width / r.height, fill: Math.max(r.width / c.width, r.height / c.height),
+        centreError: Math.hypot(r.left + r.width / 2 - (c.left + (centre.x * .5 + .5) * c.width), r.top + r.height / 2 - (c.top + (-centre.y * .5 + .5) * c.height)),
+        hudHidden: getComputedStyle(document.querySelector('.gym-toolbar')).display === 'none' };
+    });
+    assert(game.visible && game.src === 'https://montereybaygames.com/play/super-bay-drifters/embed' && game.link.startsWith('https://montereybaygames.com/play/super-bay-drifters/index.html'), JSON.stringify(game));
+    assert(game.avatarHidden && game.hudHidden && Math.abs(game.aspect - 16 / 9) < .03 && game.centreError < 2 && game.fill > .5 && game.fill < .6, `Cabinet framing ${JSON.stringify(game)}`);
+    await p.screenshot({ path: `${out}/${backend}-game-cabinet.png` });
+    // The glass with the frame hidden, to confirm the bezel lines up with the frame rectangle.
+    await p.evaluate(() => document.querySelector('.gym-arcade-game').style.display = 'none'); await p.waitForTimeout(200);
+    await p.screenshot({ path: `${out}/${backend}-game-cabinet-glass.png` });
+    await p.evaluate(() => document.querySelector('.gym-arcade-game').style.display = '');
+    await p.locator('[data-game="close"]').click();
+    await p.waitForFunction(() => qaViewer.avatarWorkbench.getSnapshot().cabinetView.blend === 0, null, { timeout: 5000 });
+    const closed = await p.evaluate(() => { const w = qaViewer.avatarWorkbench; return { open: w.getSnapshot().gameOpen, src: document.querySelector('.gym-arcade-game iframe').src, avatar: w.avatar.root.visible, hud: getComputedStyle(document.querySelector('.gym-toolbar')).display !== 'none' }; });
+    assert(!closed.open && closed.src === 'about:blank' && closed.avatar && closed.hud, JSON.stringify(closed));
+    await p.waitForTimeout(400); await p.screenshot({ path: `${out}/${backend}-game-closed.png` });
 
     // Walk back out through the door: the main map loads and the player stands on the porch.
     await walkThrough([16.5, -3.0], [16.5, -6.4, 2.2]);

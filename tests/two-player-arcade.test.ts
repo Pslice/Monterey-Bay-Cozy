@@ -141,11 +141,26 @@ test('Suite A interior screen: own scene at the real location, one budgeted batc
   close(screen.root.position.distanceTo(site.root.position), 0, 1e-9, 'same world transform as the site');
   close(screen.root.rotation.y, site.root.rotation.y, 1e-9, 'same yaw');
   assert.equal(ARCADE_GAMES[0].name, 'Super Bay Drifters');
+  assert.equal(ARCADE_GAMES[0].embedUrl, 'https://montereybaygames.com/play/super-bay-drifters/embed');
   assert.match(ARCADE_GAMES[0].url, /^https:\/\/montereybaygames\.com\/play\/super-bay-drifters\/index\.html/);
   const play = screen.interactions.find(i => i.action === 'play')!, leave = screen.interactions.find(i => i.action === 'exit')!;
   assert.equal(play.id, 'super-bay-drifters');
   const r = .3, reachable = (p: Vector3, radius: number) => [0, .3, .6, .9].some(d => [0, 1, 2, 3, 4, 5, 6, 7].some(k => { const x = p.x + Math.cos(k * Math.PI / 4) * d, z = p.z + Math.sin(k * Math.PI / 4) * d; return Math.hypot(x - p.x, z - p.z) <= radius && canStandAt(x, z, site.bounds, site.colliders, r) && site.insideSuiteAt(x, z); }));
   for (const item of screen.interactions) assert(reachable(item.position, item.radius), `${item.id} reachable from inside the suite`);
   assert(site.insideSuiteAt(leave.position.x, leave.position.z));
+  // The game runs on the lone red cabinet across from the entrance. Its glass is 16:9, faces into
+  // the room, sits on the cabinet's front above the control deck, and the play prompt stands in front of it.
+  assert.equal(ARCADE_GAMES[0].cabinet, 'red');
+  const glass = screen.screen, [gx, gz] = arcadeToLocal(glass.centre.x, glass.centre.z), [px, pz] = arcadeToLocal(play.position.x, play.position.z);
+  const R = ARCADE_LAYOUT.redCabinet, G = ARCADE_LAYOUT.gameScreen;
+  close(glass.width / glass.height, 16 / 9, 1e-9, 'glass aspect');
+  close(gz, R.z, 1e-3, 'glass centred on the red cabinet'); close(gx, ARCADE_SUITE.maxX - G.inset, 1e-3, 'glass on the cabinet front');
+  assert(G.y0 > 1.02 + .1 && G.y1 + .04 < 1.62, 'glass clears the control deck and fits the monitor housing');
+  close(glass.normal.length(), 1, 1e-6, 'unit normal'); close(glass.right.length(), 1, 1e-6, 'unit right'); close(glass.normal.dot(glass.right), 0, 1e-6, 'normal ⟂ right');
+  const toPlayer = new Vector3(play.position.x - glass.centre.x, 0, play.position.z - glass.centre.z).normalize();
+  assert(toPlayer.dot(glass.normal) > .99, 'glass faces the play spot');
+  close(pz, R.z, 1e-3, 'play spot centred on the cabinet'); assert(px < gx, 'play spot is in the room, in front of the cabinet');
+  // The right vector is to the player's right while they face the glass (−normal).
+  assert(new Vector3().crossVectors(glass.normal.clone().negate(), new Vector3(0, 1, 0)).dot(glass.right) > .99);
   screen.dispose(); site.dispose();
 });
