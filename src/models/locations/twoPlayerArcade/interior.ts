@@ -21,19 +21,25 @@ const C = INTERIOR_COLORS;
 export const ARCADE_LAYOUT = {
   cabinets: { x: S.minX, depth: .98, width: .76, centres: [-2.95, -3.8, -4.65, -5.5, -6.35] },
   redCabinet: { x: S.maxX, z: -2.35, depth: .98, width: .8 },
+  /** Widescreen monitor of the playable red cabinet: distance of the glass from the cabinet back,
+   * half width and bottom/top heights (16:9, 0.68 × 0.3825 m), above the joystick deck. The viewer lays the game's
+   * iframe exactly over this rectangle, so the two must stay in sync. */
+  gameScreen: { inset: .583, halfWidth: .34, y0: 1.17, y1: 1.5525 },
   table: { x0: 18.2, x1: 19.0, z0: -7.4, z1: -5.0, height: 1.02 },
   stools: [[17.75, -5.35], [17.75, -6.35], [17.75, -7.25], [19.45, -5.35], [19.45, -6.35], [19.45, -7.25], [18.6, -4.55], [20.7, -10.3], [22.1, -10.3]] as const,
   counter: { x0: 19.3, x1: 24.45, z0: S.back, z1: S.back + .62, height: .92 },
   crts: [[19.95, .46, 'crt', '#a8d4ff'], [21.05, .36, 'crtDark', '#7fe0a4'], [22.25, .48, 'crt', '#b9e6ff'], [23.5, .4, 'crt', '#ffd27a']] as const,
 } as const;
 
-/** Cabinet 0 is the playable Super Bay Drifters cabinet: ocean marquee, sea screen, white sails. */
-const MARQUEES = ['#1f8fd0', '#d83a3a', '#e8c840', '#4aa0e8', '#b060d8'];
-const SCREENS = ['#0b4466', '#101a34', '#151f17', '#0c1c3c', '#200c30'];
-const SPRITES = [['#ffffff', '#f6f1dc', '#ffd23a'], ['#4af0ff', '#ff6ad5', '#ffffff'], ['#ffd23a', '#54ff6a', '#ffffff'], ['#ff8a2a', '#4ac8ff', '#ffffff'], ['#ff5af0', '#5affc8', '#ffe85a']];
+/** Left-wall row. The playable Super Bay Drifters game lives on the lone red cabinet instead. */
+const MARQUEES = ['#e07a2a', '#d83a3a', '#e8c840', '#4aa0e8', '#b060d8'];
+const SCREENS = ['#101a34', '#101a34', '#151f17', '#0c1c3c', '#200c30'];
+const SPRITES = [['#ffd23a', '#4af0ff', '#ffffff'], ['#4af0ff', '#ff6ad5', '#ffffff'], ['#ffd23a', '#54ff6a', '#ffffff'], ['#ff8a2a', '#4ac8ff', '#ffffff'], ['#ff5af0', '#5affc8', '#ffe85a']];
+const DRIFTERS = { marquee: '#1f8fd0', screen: '#0b4466', sea: '#1b78a8', bezel: '#08080b', sprites: ['#ffffff', '#f6f1dc', '#ffd23a'] } as const;
 
-/** Upright cabinet with its back on a side wall. `facing` +1 faces +X, −1 faces −X. */
-function cabinet(p: Painter, level: LodLevel, backX: number, zc: number, facing: 1 | -1, body: Color, marquee: string, screen: string, sprites: readonly string[], index: number) {
+/** Upright cabinet with its back on a side wall. `facing` +1 faces +X, −1 faces −X. `game`
+ * builds the playable widescreen cabinet (black bezel, 16:9 glass from `gameScreen`). */
+function cabinet(p: Painter, level: LodLevel, backX: number, zc: number, facing: 1 | -1, body: Color, marquee: string, screen: string, sprites: readonly string[], index: number, game = false) {
   const X = (d: number) => backX + facing * d, w = .38, far = level === 'far', near = level === 'near';
   const box = (d0: number, y0: number, z0: number, d1: number, y1: number, z1: number, color: Color) => p.box(X(d0), y0, zc + z0, X(d1), y1, zc + z1, color, ['bottom']);
   const face = facing > 0 ? 'x+' : 'x-';
@@ -41,34 +47,43 @@ function cabinet(p: Painter, level: LodLevel, backX: number, zc: number, facing:
   box(0, 0, -w, .9, .92, w, body);                       // base and coin door
   box(0, .92, -w, .58, 1.62, w, body);                    // monitor housing
   box(.55, .9, -w + .02, .98, 1.02, w - .02, far ? body : C.panel); // control deck
-  box(0, 1.62, -w, .7, 1.86, w, body);                    // marquee box
+  // Marquee box. The playable cabinet is seen from just below in the cabinet view, so it keeps its underside.
+  p.box(X(0), 1.62, zc - w, X(.7), 1.86, zc + w, body, game ? [] : ['bottom']);
   if (far) return;
   front(.701, -w + .03, w - .03, 1.65, 1.83, palette({ m: marquee }).m);
-  front(.581, -w + .06, w - .06, 1.04, 1.56, palette({ s: screen }).s);
+  const G = ARCADE_LAYOUT.gameScreen;
+  if (game) {
+    // Black bezel around 16:9 glass; the viewer's iframe covers exactly the glass while playing.
+    front(.581, -G.halfWidth - .025, G.halfWidth + .025, G.y0 - .04, G.y1 + .04, palette({ b: DRIFTERS.bezel }).b);
+    front(G.inset, -G.halfWidth, G.halfWidth, G.y0, G.y1, palette({ s: screen }).s);
+  } else front(.581, -w + .06, w - .06, 1.04, 1.56, palette({ s: screen }).s);
   if (near) {
     front(.901, -.12, .12, .3, .62, C.coin);
     for (const z of [-.05, .05]) front(.905, z - .025, z + .025, .55, .6, C.coinLight);
     // Attract-mode sprites: a few bright blocks, not reproduced game graphics.
     const colors = palette({ a: sprites[0], b: sprites[1], c: sprites[2] });
-    if (index === 0) {
-      // Super Bay Drifters: three white sails over a sea band (an original motif, not game art).
-      front(.584, -.24, .24, 1.06, 1.18, palette({ s: '#1b78a8' }).s);
-      for (const [z, y, h] of [[-.14, 1.2, .2], [.02, 1.24, .26], [.16, 1.19, .17]] as const) {
-        const d = X(.588), hint = [facing, 0, 0] as const;
-        p.tri([d, y, zc + z - .06], [d, y, zc + z + .05], [d, y + h, zc + z], colors.a, hint);
+    if (game) {
+      // Super Bay Drifters attract screen: three white sails over a sea band (an original motif,
+      // not game art). Hidden behind the live game while it is being played.
+      front(G.inset + .002, -G.halfWidth + .02, G.halfWidth - .02, G.y0 + .02, G.y0 + .13, palette({ s: DRIFTERS.sea }).s);
+      for (const [z, y, h] of [[-.18, G.y0 + .14, .14], [.0, G.y0 + .17, .18], [.18, G.y0 + .14, .12]] as const) {
+        const d = X(G.inset + .005), hint = [facing, 0, 0] as const;
+        p.tri([d, y, zc + z - .05], [d, y, zc + z + .04], [d, y + h, zc + z], colors.a, hint);
       }
     } else for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) {
       if ((r * 5 + c + index) % 3 === 0) continue;
       const z = -.2 + c * .1, y = 1.42 - r * .08;
       front(.586, z - .03, z + .03, y - .025, y + .025, [colors.a, colors.b, colors.c][(r + c + index) % 3]);
     }
-    front(.586, -.05, .05, 1.1, 1.15, colors.c);
+    if (!game) front(.586, -.05, .05, 1.1, 1.15, colors.c);
     // Joystick and buttons on the control deck.
     p.cylinder(X(.74), 1.02, zc - .15, 1.12, .012, C.metal, 5);
     p.blob([X(.74), 1.14, zc - .15], [.035, .035, .035], C.coinLight);
     for (let i = 0; i < 3; i++) p.cylinder(X(.76 + (i % 2) * .06), 1.02, zc + .02 + i * .07, 1.04, .022, palette({ b: sprites[i % 3] }).b, 6);
     // T-molding edge color on the front corners.
     for (const z of [-w - .005, w + .005]) p.box(X(.0), .0, zc + z - .004, X(.9), .92, zc + z + .004, palette({ m: marquee }).m, ['bottom']);
+  } else if (game) {
+    front(G.inset + .002, -G.halfWidth + .02, G.halfWidth - .02, G.y0 + .02, G.y0 + .13, palette({ s: DRIFTERS.sea }).s);
   } else {
     front(.586, -.15, .15, 1.15, 1.45, palette({ s: sprites[0] }).s);
   }
@@ -110,10 +125,11 @@ export function buildInterior(p: Painter, ceiling: Painter, level: LodLevel) {
   p.box(door.maxX - .05, 0, zp - 1.08, door.maxX, door.height - .03, zp - .02, C.doorLeaf);
   if (!far) { p.wallRect('x-', door.maxX - .055, zp - .95, zp - .15, .9, 2.0, C.doorGlass); p.wallRect('x-', door.maxX - .06, zp - .8, zp - .3, 1.55, 1.75, C.signWhite); }
   if (near) for (let y = 1.1; y < top - .05; y += .32) p.wallRect('z+', zb + .004, 19.0, x1, y - .012, y + .012, C.mortar);
-  // ---- Cabinets along the left wall and the red cabinet beside the door.
+  // ---- Cabinets along the left wall, and the lone red cabinet across the room from the
+  // entrance, which runs Super Bay Drifters.
   const L = ARCADE_LAYOUT;
   L.cabinets.centres.forEach((z, i) => cabinet(p, level, x0, z, 1, C.cabinet, MARQUEES[i], SCREENS[i], SPRITES[i], i));
-  cabinet(p, level, x1, L.redCabinet.z, -1, C.redCab, '#ffd84a', '#160c26', SPRITES[3], 7);
+  cabinet(p, level, x1, L.redCabinet.z, -1, C.redCab, DRIFTERS.marquee, DRIFTERS.screen, DRIFTERS.sprites, 7, true);
   // ---- High-top table and stools.
   const t = L.table;
   p.box(t.x0, t.height - .05, t.z0, t.x1, t.height, t.z1, C.tableTop);
