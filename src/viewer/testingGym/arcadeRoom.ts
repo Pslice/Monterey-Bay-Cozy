@@ -2,7 +2,7 @@
  * lighting, rendered instead of the outdoor Gym while the player is inside. The room keeps the
  * arcade's real world transform, so the walking controller, colliders and LOD distances are the
  * same ones used on the porch; only the rendered scene changes at the doorway. */
-import { Color, DirectionalLight, HemisphereLight, Scene } from 'three';
+import { Color, DirectionalLight, HemisphereLight, Scene, Vector3 } from 'three';
 import { createArcadeRoom } from '../../models/locations/twoPlayerArcade/room';
 import { ARCADE_LAYOUT } from '../../models/locations/twoPlayerArcade';
 import { ARCADE_GAMES, ARCADE_SITE, ARCADE_SUITE } from '../../data/twoPlayerArcade';
@@ -27,10 +27,19 @@ export function createArcadeRoomScreen(site: ArcadeSite, rim: boolean) {
   scene.add(key, key.target);
   applyNodeStyle(room.root, rim);
 
-  const game = ARCADE_GAMES[0], L = ARCADE_LAYOUT, S = ARCADE_SUITE;
-  const cabinetZ = L.cabinets.centres[game.cabinetIndex];
+  const game = ARCADE_GAMES[0], L = ARCADE_LAYOUT, S = ARCADE_SUITE, R = L.redCabinet, G = L.gameScreen;
+  // The game's glass in world space. The cabinet backs onto the right-hand wall (local +X) and
+  // faces local −X, so a player looking at the glass faces local +X with local +Z on their right.
+  const screen = {
+    centre: site.point(S.maxX - G.inset, R.z, (G.y0 + G.y1) / 2),
+    width: G.halfWidth * 2, height: G.y1 - G.y0,
+    /** Unit vector out of the glass, toward the player. */
+    normal: new Vector3(-ARCADE_SITE.along[0], 0, -ARCADE_SITE.along[1]),
+    /** Unit vector along the glass, to the player's right. */
+    right: new Vector3(ARCADE_SITE.front[0], 0, ARCADE_SITE.front[1]),
+  };
   const interactions: GymInteraction[] = [
-    { id: game.id, label: `Play ${game.name}`, action: 'play', radius: 1.05, position: site.point(S.minX + L.cabinets.depth + .45, cabinetZ, .04),
+    { id: game.id, label: `Play ${game.name}`, action: 'play', radius: 1.05, position: site.point(S.maxX - R.depth - .45, R.z, .04),
       description: `${game.name} by ${game.publisher}: race sailboats around Monterey Bay. Press E to play.` },
     { id: 'arcade-cabinets', label: 'Look at the cabinets', action: 'inspect', radius: 1.1, position: site.point(S.minX + L.cabinets.depth + .45, -5.5, .04),
       description: 'A row of upright cabinets with lit marquees. Cabinet art is abstract here; the real line-up changes.' },
@@ -41,7 +50,7 @@ export function createArcadeRoomScreen(site: ArcadeSite, rim: boolean) {
   ];
   let disposed = false;
   return {
-    scene, root: room.root, interactions, game,
+    scene, root: room.root, interactions, game, screen,
     dispose() { if (disposed) return; disposed = true; key.shadow.map?.dispose(); room.dispose(); scene.clear(); },
   };
 }
