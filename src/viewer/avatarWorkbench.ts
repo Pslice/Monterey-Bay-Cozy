@@ -509,7 +509,7 @@ export function createAvatarWorkbench(studioHost:HTMLElement,gymHost:HTMLElement
     if(!arcadeRoom||gameOpen)return;
     const game=arcadeRoom.game;gameOpen=true;clearInput();closeEmotes();setPrompt();
     gameOverlay.setAttribute('aria-label',game.name);gameOverlay.querySelector('strong')!.textContent=`${game.name} · ${game.publisher}`;
-    gameOverlay.querySelector('a')!.href=game.url;gameFrame.title=game.name;gameFrame.src=game.url;gameOverlay.hidden=false;
+    gameOverlay.querySelector('a')!.href=game.url;gameFrame.title=game.name;gameFrame.src=game.embedUrl;gameOverlay.hidden=false;
     interacted.add(game.id);gameFrame.focus();
   }
   function closeGame(){
